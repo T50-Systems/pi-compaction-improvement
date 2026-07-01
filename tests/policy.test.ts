@@ -76,4 +76,9 @@ describe("buildAutoCompactInstructions", () => {
     expect(instructions).toContain("[AUTOCOMPACT_MODE=aggressive]");
     expect(instructions).toContain("[AUTOCOMPACT_REASON=rapid-growth]");
   });
+
+  it("preserves continuation intent in trigger instructions", () => {
+    const instructions = buildAutoCompactInstructions("tool-heavy-turn", "aggressive");
+    expect(instructions).toContain("whether the agent should continue without asking the user");
+  });
 });

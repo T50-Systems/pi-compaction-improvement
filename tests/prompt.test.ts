@@ -25,6 +25,8 @@ describe("buildSummarizationPrompt", () => {
     expect(prompt).toContain("## Discarded Hypotheses");
     expect(prompt).toContain("## Risks");
     expect(prompt).toContain("## Immediate Next Action");
+    expect(prompt).toContain("## Continuation Contract");
+    expect(prompt).toContain("Resume automatically after compaction");
   });
 
   it("adds split-turn guidance when needed", () => {
@@ -36,6 +38,13 @@ describe("buildSummarizationPrompt", () => {
     const prompt = buildSummarizationPrompt({ mode: "focused", previousSummary: true, customInstructions: "Focus on deploy blockers.", hasSplitTurn: false });
     expect(prompt).toContain("Additional focus: Focus on deploy blockers.");
     expect(prompt).toContain("Update the existing structured summary");
+  });
+
+  it("instructs summaries to preserve automatic continuation", () => {
+    const prompt = buildSummarizationPrompt({ mode: "standard", previousSummary: false, hasSplitTurn: false });
+    expect(prompt).toContain("Continuation Contract must say whether the agent should resume automatically after compaction.");
+    expect(prompt).toContain("Set Resume automatically to yes unless progress is blocked");
+    expect(prompt).toContain("executable instruction, not a question or status recap");
   });
 
   it("strips autocompact directives before showing custom focus", () => {

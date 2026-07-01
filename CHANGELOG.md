@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.5
+
+- Adds a `Continuation Contract` to compaction summaries so resumed agents know whether to continue automatically or ask the user
+- Strengthens autocompact trigger instructions to preserve executable next actions across compaction
+
 ## v0.1.4
 
 - Adds proactive autocompact triggering on `turn_end`

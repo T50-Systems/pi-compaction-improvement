@@ -1,6 +1,6 @@
 {
   "name": "pi-compaction-improvement",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Compaction improvement package for Pi with proactive autocompaction and richer summaries.",
   "type": "module",
   "license": "MIT",

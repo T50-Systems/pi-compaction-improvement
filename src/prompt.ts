@@ -45,6 +45,10 @@ const TEMPLATE = `## Goal
 ## Immediate Next Action
 1. [Exactly one concrete next step the next agent should do first]
 
+## Continuation Contract
+- Resume automatically after compaction: [yes/no]
+- If no, ask the user exactly this: [specific question or approval needed]
+
 ## Next Steps
 1. [Ordered follow-up actions after the immediate next action]
 
@@ -85,6 +89,9 @@ export function buildSummarizationPrompt(input: BuildPromptInput): string {
     "Record discarded hypotheses only when they prevent repeated work.",
     "Separate immediate blockers from broader risks.",
     "Immediate Next Action must contain exactly one concrete first step.",
+    "Continuation Contract must say whether the agent should resume automatically after compaction.",
+    "Set Resume automatically to yes unless progress is blocked by missing user input, approval, credentials, or an external dependency.",
+    "If Resume automatically is yes, phrase the next action as an executable instruction, not a question or status recap.",
     "Keep the summary concise but operationally complete.",
   ];
 

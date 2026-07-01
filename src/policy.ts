@@ -62,11 +62,11 @@ export function computeThresholds(contextWindow: number, config: AutoCompactConf
 export function buildAutoCompactInstructions(reason: Exclude<AutoCompactDecisionReason, "none" | "disabled" | "cooldown" | "in-flight">, mode: AutoCompactDecisionMode): string {
   const directives = [`[AUTOCOMPACT_MODE=${mode}]`, `[AUTOCOMPACT_REASON=${reason}]`];
   const bodyByReason: Record<Exclude<AutoCompactDecisionReason, "none" | "disabled" | "cooldown" | "in-flight">, string> = {
-    "soft-threshold": "Autocompact v2 triggered at the proactive soft threshold. Keep a balanced checkpoint that preserves the goal, constraints, concrete progress, blockers, exact files, and the single immediate next action.",
-    "rapid-growth": "Autocompact v2 triggered because context grew quickly. Compress aggressively, minimize narration, and preserve only the facts required to continue safely.",
-    "sustained-growth": "Autocompact v2 triggered after several consecutive growth turns. Emphasize the evolving state, unresolved blockers, and the best next step so future turns stay compact.",
-    "emergency-near-limit": "Autocompact v2 triggered in the emergency band near the hard context limit. Compress aggressively, keep exact errors and file paths, and avoid any redundant history.",
-    "tool-heavy-turn": "Autocompact v2 triggered after a tool-heavy turn. Preserve the actionable conclusions from tool output, exact files touched, unresolved risks, and the single next action.",
+    "soft-threshold": "Autocompact v2 triggered at the proactive soft threshold. Keep a balanced checkpoint that preserves the goal, constraints, concrete progress, blockers, exact files, the single immediate next action, and whether the agent should resume automatically after compaction.",
+    "rapid-growth": "Autocompact v2 triggered because context grew quickly. Compress aggressively, minimize narration, and preserve only the facts required to continue safely, including the executable next action and whether to resume automatically.",
+    "sustained-growth": "Autocompact v2 triggered after several consecutive growth turns. Emphasize the evolving state, unresolved blockers, and the best next step so future turns stay compact and can resume without waiting when unblocked.",
+    "emergency-near-limit": "Autocompact v2 triggered in the emergency band near the hard context limit. Compress aggressively, keep exact errors and file paths, avoid redundant history, and preserve the action needed to resume after compaction.",
+    "tool-heavy-turn": "Autocompact v2 triggered after a tool-heavy turn. Preserve the actionable conclusions from tool output, exact files touched, unresolved risks, the single next action, and whether the agent should continue without asking the user.",
   };
   return `${directives.join("\n")}\n\n${bodyByReason[reason]}`;
 }
