@@ -1,50 +1,48 @@
 # pi-compaction-improvement
 
-Canonical compaction/resume state repo for Pi work.
+Compaction improvement package and state repo for Pi.
 
-This repo is not just a tracker.
-It is intended to hold the current compaction-safe working state that Pi can read to resume active work after chat history compacts.
+This repo now serves **two purposes**:
+1. a real Pi package that improves compaction behavior
+2. a durable compaction/resume state repo for recovering work after chat compaction
 
-## Linked local worktree
+## Package role
+This package is the successor path for the functionality originally coming from:
+- `git:github.com/cervantesh/pi-autocompact-v2@v0.2.0`
 
+It improves both:
+- **when** Pi compacts: proactive policy on `turn_end`
+- **how** Pi summarizes: richer `session_before_compact` summary output
+
+### What it changes
+- proactive trigger on soft threshold, rapid growth, sustained growth, tool-heavy turns, and near-limit emergency band
+- cooldown and in-flight safety guards
+- richer structured summaries with preserved paths, commands, files, risks, and next actions
+- manual commands such as `/autocompact-now`, `/autocompact-status`, and `/autocompact-config`
+
+### Install in Pi
+```bash
+pi install git:github.com/T50-Systems/pi-compaction-improvement@main
+```
+
+## State repo role
+Top-level active state files:
+- `ACTIVE-COMPACT-STATE.json`
+- `ACTIVE-COMPACT-STATE.md`
+- `PROTOCOL.md`
+
+These keep the compaction-safe working state outside chat history.
+
+## Linked local work
 - Active source repo: `C:/dev/pi/pi-gui`
 - Local companion repo: `C:/dev/pi/pi-compaction-improvement`
 
-## What Pi should read first
+## Reports and checkpoints
+- `reports/` — investigation and comparison artifacts
+- `checkpoints/` — timestamped resume checkpoints
 
-Top-level active state files:
-- `ACTIVE-COMPACT-STATE.json` — machine-readable current state
-- `ACTIVE-COMPACT-STATE.md` — human-readable resume note
-- `PROTOCOL.md` — update/read contract for future sessions
-
-.git-tracked history plus timestamped checkpoint files under `checkpoints/` provide the durable trail.
-
-## Purpose
-
-Keep the current resumable state outside chat history so compaction does not erase:
-- the active objective
-- whether work is finished / in progress / interrupted
-- the exact next step
-- key files touched
-- verification already completed
-- known blockers / cautions
-
-## Current repo role
-
-This repo can still contain investigation reports and diffs, but those are now secondary.
-The primary role is to be the source of truth for active compaction state.
-
-## Existing analysis artifacts
-
-- `reports/compact-surface-map.md` — compact touchpoints found in the source repo
-- `reports/origin-comparison.md` — comparison against `origin/main`
-- `patches/compact-vs-origin.patch` — focused diff for compact-related files
-
-## Recommended operating rule
-
-Before and after major work slices, update:
-1. `ACTIVE-COMPACT-STATE.json`
-2. `ACTIVE-COMPACT-STATE.md`
-3. add a timestamped file under `checkpoints/` when the checkpoint is significant
-
-That way Pi can resume from this repo instead of depending on volatile chat context.
+## Important distinction
+This repo is no longer only a tracker.
+It is both:
+- an installable Pi package for compaction improvement
+- the source of truth for active compaction state

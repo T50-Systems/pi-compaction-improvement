@@ -1,0 +1,53 @@
+{
+  "name": "pi-compaction-improvement",
+  "version": "0.1.0",
+  "description": "Compaction improvement package for Pi with proactive autocompaction, richer summaries, and repo-tracked compaction state.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "compaction",
+    "autocompact",
+    "proactive-compaction"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "tests",
+    "docs",
+    "reports",
+    "checkpoints",
+    "README.md",
+    "PROTOCOL.md",
+    "ACTIVE-COMPACT-STATE.json",
+    "ACTIVE-COMPACT-STATE.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.80.2",
+    "@earendil-works/pi-coding-agent": "^0.80.2",
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
