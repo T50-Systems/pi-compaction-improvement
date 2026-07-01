@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0
+## v0.1.4
 
 - Adds proactive autocompact triggering on `turn_end`
 - Triggers earlier on soft threshold, rapid growth, sustained growth, tool-heavy turns, and emergency near-limit conditions
