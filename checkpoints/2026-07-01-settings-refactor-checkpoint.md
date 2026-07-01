@@ -2,10 +2,14 @@
 
 ## Status
 - in progress
-- interrupted by compactation before completion
+- interrupted by compaction before completion
 
 ## Active work
 Refactor `pi-gui` Settings from a generic/evolved `SecondarySurface` shell toward a dedicated Settings sidebar and surface.
+
+## Linked local work
+- Source repo: `C:/dev/pi/pi-gui`
+- Companion state repo: `C:/dev/pi/pi-compaction-improvement`
 
 ## Already completed before interruption
 - persisted agent visible narration preferences
@@ -26,4 +30,4 @@ Replace the current Settings shell with a dedicated sidebar structure and more p
 
 ## Resume note
 Do not claim the Settings redesign complete yet.
-The compactation mitigation work is in place; the product refactor itself still needs implementation.
+The compaction mitigation work is in place; the product refactor itself still needs implementation.

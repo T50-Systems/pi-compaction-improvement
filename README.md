@@ -1,9 +1,14 @@
-# pi-compact-tracker
+# pi-compaction-improvement
 
-Canonical compactation/resume state repo for Pi work.
+Canonical compaction/resume state repo for Pi work.
 
-This repo is **not just a tracker**.
-It is intended to hold the current compactation-safe working state that Pi can read to resume active work after chat history compacts.
+This repo is not just a tracker.
+It is intended to hold the current compaction-safe working state that Pi can read to resume active work after chat history compacts.
+
+## Linked local worktree
+
+- Active source repo: `C:/dev/pi/pi-gui`
+- Local companion repo: `C:/dev/pi/pi-compaction-improvement`
 
 ## What Pi should read first
 
@@ -16,7 +21,7 @@ Top-level active state files:
 
 ## Purpose
 
-Keep the current resumable state outside chat history so compactation does not erase:
+Keep the current resumable state outside chat history so compaction does not erase:
 - the active objective
 - whether work is finished / in progress / interrupted
 - the exact next step
@@ -27,7 +32,7 @@ Keep the current resumable state outside chat history so compactation does not e
 ## Current repo role
 
 This repo can still contain investigation reports and diffs, but those are now secondary.
-The primary role is to be the **source of truth for active compactation state**.
+The primary role is to be the source of truth for active compaction state.
 
 ## Existing analysis artifacts
 

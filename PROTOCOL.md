@@ -1,6 +1,10 @@
-# Compact state protocol
+# Compaction state protocol
 
-This repo is the canonical source of compactation-safe working state.
+This repo is the canonical source of compaction-safe working state.
+
+## Linked local work
+- Source repo: `C:/dev/pi/pi-gui`
+- Companion state repo: `C:/dev/pi/pi-compaction-improvement`
 
 ## Read order
 1. `ACTIVE-COMPACT-STATE.json`
@@ -12,7 +16,7 @@ This repo is the canonical source of compactation-safe working state.
 Every active checkpoint should capture:
 - objective / current work summary
 - status: `finished` | `in_progress` | `interrupted`
-- whether compactation interrupted the last slice
+- whether compaction interrupted the last slice
 - exact next step
 - key files
 - last verification run
@@ -28,5 +32,5 @@ Before and after any major refactor or debugging slice:
 The format is intentionally simple so a coding agent can recover context by reading plain Markdown or JSON from Git.
 
 ## Important distinction
-This repo is **not merely a tracker**.
-It is meant to be the active, durable resume point for Pi after chat compactation.
+This repo is not merely a tracker.
+It is meant to be the active, durable resume point for Pi after chat compaction.

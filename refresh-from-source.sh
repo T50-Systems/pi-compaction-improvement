@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOURCE_REPO="/c/Users/c___h/source/repos/pi-gui"
-OUT_REPO="/c/Users/c___h/source/repos/pi-compact-tracker"
+SOURCE_REPO="/c/dev/pi/pi-gui"
+OUT_REPO="/c/dev/pi/pi-compaction-improvement"
 
 cd "$SOURCE_REPO"
 git diff --unified=3 origin/main -- \

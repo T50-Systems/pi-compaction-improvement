@@ -1,8 +1,12 @@
 # Active compact state
 
+## Linked local work
+- Source repo: `C:/dev/pi/pi-gui`
+- Companion state repo: `C:/dev/pi/pi-compaction-improvement`
+
 ## Status
 - Work is **in progress**
-- The previous interruption was caused by **compactation**, not task completion
+- The previous interruption was caused by **compaction**, not task completion
 
 ## Active product work
 Repository: `T50-Systems/pi-gui`
@@ -27,8 +31,8 @@ Implement a dedicated Settings sidebar/shell with:
 - more product-like spacing and typography
 
 ## Resume rules for Pi
-When resuming from compactation:
+When resuming from compaction:
 1. read `ACTIVE-COMPACT-STATE.json`
-2. report explicitly whether the work is finished, still in progress, or was interrupted by compactation
+2. report explicitly whether the work is finished, still in progress, or was interrupted by compaction
 3. use the listed files as the first inspection targets
 4. persist a fresh checkpoint before and after large refactors
