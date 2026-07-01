@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -40,9 +41,7 @@ interface PersistedActiveCompactState {
 
 function expandHome(input: string): string {
   if (!input.startsWith("~")) return input;
-  const home = process.env.USERPROFILE ?? process.env.HOME;
-  if (!home) return input;
-  return path.join(home, input.slice(1));
+  return path.join(homedir(), input.slice(1));
 }
 
 async function pathExists(target: string): Promise<boolean> {
@@ -54,21 +53,45 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+async function hasStateRepoShape(target: string): Promise<boolean> {
+  const required = [
+    path.join(target, "ACTIVE-COMPACT-STATE.json"),
+    path.join(target, "ACTIVE-COMPACT-STATE.md"),
+    path.join(target, "checkpoints"),
+  ];
+  return (await Promise.all(required.map((entry) => pathExists(entry)))).every(Boolean);
+}
+
 async function detectPackageStateRepo(): Promise<string | undefined> {
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const required = [
-    path.join(packageRoot, "ACTIVE-COMPACT-STATE.json"),
-    path.join(packageRoot, "ACTIVE-COMPACT-STATE.md"),
-    path.join(packageRoot, "checkpoints"),
-  ];
-  const allExist = (await Promise.all(required.map((entry) => pathExists(entry)))).every(Boolean);
-  return allExist ? packageRoot : undefined;
+  return (await hasStateRepoShape(packageRoot)) ? packageRoot : undefined;
+}
+
+async function detectLocalCanonicalRepo(): Promise<string | undefined> {
+  const candidate = path.resolve("C:/dev/pi/pi-compaction-improvement");
+  return (await hasStateRepoShape(candidate)) ? candidate : undefined;
+}
+
+function getAgentFallbackRepo(): string {
+  return path.join(homedir(), ".pi", "agent", "compaction-state");
 }
 
 export async function resolveStateRepoPath(configuredStateRepoPath: string | undefined, cwd: string): Promise<string | undefined> {
+  const envRepo = process.env.PI_COMPACTION_STATE_REPO?.trim();
+  if (envRepo) {
+    return path.resolve(cwd, expandHome(envRepo));
+  }
+
   if (configuredStateRepoPath) {
     return path.resolve(cwd, expandHome(configuredStateRepoPath));
   }
+
+  const localRepo = await detectLocalCanonicalRepo();
+  if (localRepo) return localRepo;
+
+  const agentFallback = getAgentFallbackRepo();
+  if (await pathExists(path.dirname(agentFallback))) return agentFallback;
+
   return detectPackageStateRepo();
 }
 
