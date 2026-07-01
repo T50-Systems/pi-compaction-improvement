@@ -1,7 +1,7 @@
 {
   "name": "pi-compaction-improvement",
   "version": "0.1.0",
-  "description": "Compaction improvement package for Pi with proactive autocompaction, richer summaries, and repo-tracked compaction state.",
+  "description": "Compaction improvement package for Pi with proactive autocompaction and richer summaries.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -27,12 +27,7 @@
     "src",
     "tests",
     "docs",
-    "reports",
-    "checkpoints",
     "README.md",
-    "PROTOCOL.md",
-    "ACTIVE-COMPACT-STATE.json",
-    "ACTIVE-COMPACT-STATE.md",
     "CHANGELOG.md",
     "LICENSE"
   ],

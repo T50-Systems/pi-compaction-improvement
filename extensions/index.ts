@@ -28,7 +28,6 @@ import {
   type AutoCompactState,
   type StatusSnapshot,
 } from "../src/state.ts";
-import { persistCompactionState } from "../src/state-repo.ts";
 import { estimateToolResultTokens } from "../src/tool-results.ts";
 
 const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Read the provided conversation material and output only the requested structured summary. Do not continue the conversation.`;
@@ -273,20 +272,6 @@ export default function (pi: ExtensionAPI) {
     noteCompactionCompleted(state, state.lastTriggerTurn, source, completedReason);
     const snapshot = await buildStatusSnapshot(ctx, state);
     applyStatus(ctx, snapshot);
-
-    await persistCompactionState({
-      cwd: ctx.cwd,
-      configuredStateRepoPath: snapshot.config.stateRepoPath,
-      phase: "after",
-      trigger: completedReason,
-      source,
-      tokensBefore: event.compactionEntry.tokensBefore,
-      firstKeptEntryId: event.compactionEntry.firstKeptEntryId,
-      readFiles: (event.compactionEntry.details as { readFiles?: string[] } | undefined)?.readFiles ?? [],
-      modifiedFiles: (event.compactionEntry.details as { modifiedFiles?: string[] } | undefined)?.modifiedFiles ?? [],
-      summary: event.compactionEntry.summary,
-    });
-
     debugNotify(ctx, snapshot.config.debug, `compaction completed via ${source} (${event.reason})`);
   });
 
@@ -362,19 +347,6 @@ export default function (pi: ExtensionAPI) {
       settings,
     } = preparation;
 
-    const configInfo = await loadEffectiveConfig(ctx.cwd, ctx.isProjectTrusted());
-    const currentFiles = computeFileLists(fileOps as FileOps);
-    await persistCompactionState({
-      cwd: ctx.cwd,
-      configuredStateRepoPath: configInfo.config.stateRepoPath,
-      phase: "before",
-      trigger: state.lastCompactionReason,
-      source: state.lastCompactionSource,
-      tokensBefore,
-      firstKeptEntryId,
-      readFiles: currentFiles.readFiles,
-      modifiedFiles: currentFiles.modifiedFiles,
-    });
 
     const summaryReason =
       state.lastCompactionReason === "manual-now"
@@ -451,21 +423,10 @@ export default function (pi: ExtensionAPI) {
 
       summary = stripFileTags(summary);
       const previousFiles = parseFileLists(previousSummary);
+      const currentFiles = computeFileLists(fileOps as FileOps);
       const mergedFiles = mergeFileLists(previousFiles, currentFiles);
       summary += formatFileOperations(mergedFiles.readFiles, mergedFiles.modifiedFiles);
 
-      await persistCompactionState({
-        cwd: ctx.cwd,
-        configuredStateRepoPath: configInfo.config.stateRepoPath,
-        phase: "after",
-        trigger: state.lastCompactionReason,
-        source: "extension",
-        tokensBefore,
-        firstKeptEntryId,
-        readFiles: mergedFiles.readFiles,
-        modifiedFiles: mergedFiles.modifiedFiles,
-        summary,
-      });
 
       return {
         compaction: {
