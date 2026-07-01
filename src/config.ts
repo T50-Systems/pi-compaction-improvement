@@ -17,6 +17,7 @@ export interface AutoCompactConfig {
   minToolResults: number;
   debug: boolean;
   showStatus: boolean;
+  stateRepoPath?: string;
 }
 
 export interface ConfigLoadResult {
@@ -44,6 +45,7 @@ export const DEFAULT_CONFIG: AutoCompactConfig = {
   minToolResults: 2,
   debug: false,
   showStatus: true,
+  stateRepoPath: undefined,
 };
 
 type RawConfig = Partial<Record<keyof AutoCompactConfig, unknown>>;
@@ -63,6 +65,7 @@ const INTEGER_FIELDS: Array<keyof AutoCompactConfig> = [
 ];
 
 const BOOLEAN_FIELDS: Array<keyof AutoCompactConfig> = ["enabled", "debug", "showStatus"];
+const STRING_FIELDS: Array<keyof AutoCompactConfig> = ["stateRepoPath"];
 
 function normalizeInteger(value: unknown, fallback: number, minimum: number, maximum?: number): number {
   const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
@@ -82,6 +85,12 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
+function normalizeString(value: unknown, fallback?: string): string | undefined {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export function normalizeConfig(raw?: RawConfig | null): AutoCompactConfig {
   const input = raw ?? {};
   const config: AutoCompactConfig = {
@@ -99,6 +108,7 @@ export function normalizeConfig(raw?: RawConfig | null): AutoCompactConfig {
     minToolResults: normalizeInteger(input.minToolResults, DEFAULT_CONFIG.minToolResults, 0),
     debug: normalizeBoolean(input.debug, DEFAULT_CONFIG.debug),
     showStatus: normalizeBoolean(input.showStatus, DEFAULT_CONFIG.showStatus),
+    stateRepoPath: normalizeString(input.stateRepoPath, DEFAULT_CONFIG.stateRepoPath),
   };
 
   if (config.softBufferTokens < config.emergencyBufferTokens) {
@@ -212,6 +222,7 @@ export function formatConfigSummary(config: AutoCompactConfig): string {
     `emergencyBuffer=${config.emergencyBufferTokens}`,
     `minDelta=${config.minDeltaTokens}`,
     `cooldownTurns=${config.minTurnsBetweenCompacts}`,
+    `stateRepo=${config.stateRepoPath ?? "auto"}`,
   ].join(" | ");
 }
 
@@ -228,6 +239,9 @@ export function coerceRawConfigValue(key: keyof AutoCompactConfig, value: unknow
       return undefined;
     }
     return typeof value === "boolean" ? value : undefined;
+  }
+  if (STRING_FIELDS.includes(key)) {
+    return normalizeString(value);
   }
   return undefined;
 }

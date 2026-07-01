@@ -28,6 +28,7 @@ import {
   type AutoCompactState,
   type StatusSnapshot,
 } from "../src/state.ts";
+import { persistCompactionState } from "../src/state-repo.ts";
 import { estimateToolResultTokens } from "../src/tool-results.ts";
 
 const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Read the provided conversation material and output only the requested structured summary. Do not continue the conversation.`;
@@ -267,11 +268,26 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_compact", async (event, ctx) => {
+    const source = event.fromExtension ? "extension" : "core";
     const completedReason = event.fromExtension && state.lastCompactionReason ? state.lastCompactionReason : event.reason;
-    noteCompactionCompleted(state, state.lastTriggerTurn, event.fromExtension ? "extension" : "core", completedReason);
+    noteCompactionCompleted(state, state.lastTriggerTurn, source, completedReason);
     const snapshot = await buildStatusSnapshot(ctx, state);
     applyStatus(ctx, snapshot);
-    debugNotify(ctx, snapshot.config.debug, `compaction completed via ${event.fromExtension ? "extension" : "core"} (${event.reason})`);
+
+    await persistCompactionState({
+      cwd: ctx.cwd,
+      configuredStateRepoPath: snapshot.config.stateRepoPath,
+      phase: "after",
+      trigger: completedReason,
+      source,
+      tokensBefore: event.compactionEntry.tokensBefore,
+      firstKeptEntryId: event.compactionEntry.firstKeptEntryId,
+      readFiles: (event.compactionEntry.details as { readFiles?: string[] } | undefined)?.readFiles ?? [],
+      modifiedFiles: (event.compactionEntry.details as { modifiedFiles?: string[] } | undefined)?.modifiedFiles ?? [],
+      summary: event.compactionEntry.summary,
+    });
+
+    debugNotify(ctx, snapshot.config.debug, `compaction completed via ${source} (${event.reason})`);
   });
 
   pi.on("turn_end", async (event, ctx) => {
@@ -335,7 +351,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_before_compact", async (event, ctx) => {
-    const { preparation, signal, customInstructions, reason, willRetry } = event;
+    const { preparation, signal, customInstructions } = event;
     const {
       messagesToSummarize,
       turnPrefixMessages,
@@ -345,6 +361,28 @@ export default function (pi: ExtensionAPI) {
       fileOps,
       settings,
     } = preparation;
+
+    const configInfo = await loadEffectiveConfig(ctx.cwd, ctx.isProjectTrusted());
+    const currentFiles = computeFileLists(fileOps as FileOps);
+    await persistCompactionState({
+      cwd: ctx.cwd,
+      configuredStateRepoPath: configInfo.config.stateRepoPath,
+      phase: "before",
+      trigger: state.lastCompactionReason,
+      source: state.lastCompactionSource,
+      tokensBefore,
+      firstKeptEntryId,
+      readFiles: currentFiles.readFiles,
+      modifiedFiles: currentFiles.modifiedFiles,
+    });
+
+    const summaryReason =
+      state.lastCompactionReason === "manual-now"
+        ? "manual"
+        : state.lastCompactionReason === "emergency-near-limit"
+          ? "overflow"
+          : "threshold";
+    const willRetry = false;
 
     const model = ctx.model;
     if (!model) {
@@ -361,11 +399,11 @@ export default function (pi: ExtensionAPI) {
     const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
     if (allMessages.length === 0) return;
 
-    const mode = resolveSummaryMode({ reason, willRetry, customInstructions });
+    const mode = resolveSummaryMode({ reason: summaryReason, willRetry, customInstructions });
     const promptText = [
       `<conversation>\n${serializeConversation(convertToLlm(allMessages))}\n</conversation>`,
       previousSummary ? `<previous-summary>\n${previousSummary}\n</previous-summary>` : "",
-      `<compaction-context>\nreason=${reason}\nmode=${mode}\nsplitTurn=${String(turnPrefixMessages.length > 0)}\ntrigger=${state.lastCompactionReason ?? "unknown"}\n</compaction-context>`,
+      `<compaction-context>\nreason=${summaryReason}\nmode=${mode}\nsplitTurn=${String(turnPrefixMessages.length > 0)}\ntrigger=${state.lastCompactionReason ?? "unknown"}\n</compaction-context>`,
       buildSummarizationPrompt({
         mode,
         previousSummary: Boolean(previousSummary),
@@ -413,9 +451,21 @@ export default function (pi: ExtensionAPI) {
 
       summary = stripFileTags(summary);
       const previousFiles = parseFileLists(previousSummary);
-      const currentFiles = computeFileLists(fileOps as FileOps);
       const mergedFiles = mergeFileLists(previousFiles, currentFiles);
       summary += formatFileOperations(mergedFiles.readFiles, mergedFiles.modifiedFiles);
+
+      await persistCompactionState({
+        cwd: ctx.cwd,
+        configuredStateRepoPath: configInfo.config.stateRepoPath,
+        phase: "after",
+        trigger: state.lastCompactionReason,
+        source: "extension",
+        tokensBefore,
+        firstKeptEntryId,
+        readFiles: mergedFiles.readFiles,
+        modifiedFiles: mergedFiles.modifiedFiles,
+        summary,
+      });
 
       return {
         compaction: {
