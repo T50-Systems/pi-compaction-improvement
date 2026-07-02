@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.6
+
+- Moves proactive autocompact from `turn_end` to `agent_end` so it does not interrupt an active agent/tool loop
+- Keeps compaction as post-run maintenance instead of mid-work interruption
+
 ## v0.1.5
 
 - Adds a `Continuation Contract` to compaction summaries so resumed agents know whether to continue automatically or ask the user

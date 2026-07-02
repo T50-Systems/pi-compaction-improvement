@@ -253,6 +253,7 @@ function registerCommands(pi: ExtensionAPI, state: AutoCompactState): void {
 
 export default function (pi: ExtensionAPI) {
   const state = createInitialState();
+  let agentTurnIndex = 0;
   registerCommands(pi, state);
 
   pi.on("session_start", async (_event, ctx) => {
@@ -275,22 +276,24 @@ export default function (pi: ExtensionAPI) {
     debugNotify(ctx, snapshot.config.debug, `compaction completed via ${source} (${event.reason})`);
   });
 
-  pi.on("turn_end", async (event, ctx) => {
+  pi.on("agent_end", async (event, ctx) => {
+    agentTurnIndex += 1;
     const usage = ctx.getContextUsage();
     if (!usage || usage.tokens === null) return;
 
     const configInfo = await loadEffectiveConfig(ctx.cwd, ctx.isProjectTrusted());
+    const toolResults = (event.messages as Array<{ type?: string; content?: unknown; details?: unknown }>).filter((message) => message.type === "toolResult");
     const evaluation = decideAutoCompact({
       config: configInfo.config,
       currentTokens: usage.tokens,
       previousTokens: state.previousTokens,
       contextWindow: usage.contextWindow,
-      turnIndex: event.turnIndex,
+      turnIndex: agentTurnIndex,
       consecutiveGrowthTurns: state.consecutiveGrowthTurns,
       compactInFlight: state.compactInFlight,
       lastTriggerTurn: state.lastTriggerTurn,
-      toolResultTokens: estimateToolResultTokens(event.toolResults),
-      toolResultsCount: event.toolResults.length,
+      toolResultTokens: estimateToolResultTokens(toolResults),
+      toolResultsCount: toolResults.length,
     });
 
     noteEvaluation(state, evaluation);
@@ -312,14 +315,14 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (!evaluation.decision.compact) {
-      debugNotify(ctx, configInfo.config.debug, `no compact (${evaluation.decision.reason}) at turn ${event.turnIndex}`);
+      debugNotify(ctx, configInfo.config.debug, `no compact (${evaluation.decision.reason}) after agent turn ${agentTurnIndex}`);
       return;
     }
 
-    noteCompactionRequested(state, event.turnIndex, evaluation.decision.reason);
+    noteCompactionRequested(state, agentTurnIndex, evaluation.decision.reason);
     notify(
       ctx,
-      `Autocompact v2: ${evaluation.decision.reason} at ${usage.tokens.toLocaleString()} tokens; compacting now.`,
+      `Autocompact v2: ${evaluation.decision.reason} at ${usage.tokens.toLocaleString()} tokens after agent completion; compacting now.`,
       "info",
     );
 

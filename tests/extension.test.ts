@@ -8,7 +8,7 @@ describe("extension registration", () => {
 
     extension({ on, registerCommand } as never);
 
-    expect(on).toHaveBeenCalledWith("turn_end", expect.any(Function));
+    expect(on).toHaveBeenCalledWith("agent_end", expect.any(Function));
     expect(on).toHaveBeenCalledWith("session_before_compact", expect.any(Function));
     expect(on).toHaveBeenCalledWith("session_compact", expect.any(Function));
     expect(registerCommand).toHaveBeenCalledWith("autocompact-status", expect.any(Object));
