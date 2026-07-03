@@ -8,7 +8,7 @@ import {
 } from "../file-tags.ts";
 import { computeFileLists } from "./file-operations.ts";
 import { parseBeforeCompactEvent } from "./event-guard.ts";
-import { buildValidatedCompaction } from "./result-guard.ts";
+import { buildCompactionPlan } from "./compaction-plan.ts";
 import {
 	buildNoPriorHistorySummary,
 	buildSummaryRequest,
@@ -21,10 +21,11 @@ import {
 	requestSummary,
 	type SummaryProviderInput,
 } from "./summary-provider.ts";
-import { validateSummarySize } from "./summary-size-policy.ts";
+import { commitVerifiedCompaction } from "./compaction-workflow.ts";
 import { validateSummaryStructure } from "./summary-structure-guard.ts";
 import { notify } from "./telemetry.ts";
 import type { NotifyContextPort } from "./ports.ts";
+import type { ValidatedExtensionCompaction } from "./types.ts";
 
 interface SummaryContextPort extends NotifyContextPort {
 	model?: SummaryProviderInput["model"];
@@ -35,7 +36,7 @@ interface SummaryContextPort extends NotifyContextPort {
 	};
 }
 
-type CompactionResult = ReturnType<typeof buildValidatedCompaction>;
+type CompactionResult = ValidatedExtensionCompaction | undefined;
 
 type SummaryAttemptFailure =
 	| {
@@ -43,7 +44,7 @@ type SummaryAttemptFailure =
 			message?: string;
 	  }
 	| {
-			reason: "invalid-structure" | "too-long" | "invalid-result";
+			reason: "invalid-structure" | "too-long" | "invalid-result" | "verification-failed";
 			message?: string;
 	  };
 
@@ -113,6 +114,14 @@ export async function handleBeforeCompact(
 	const previousFiles = parseFileLists(previousSummary);
 	const currentFiles = computeFileLists(fileOps);
 	const mergedFiles = mergeFileLists(previousFiles, currentFiles);
+	const plan = buildCompactionPlan({
+		preparation,
+		state,
+		reason,
+		willRetry,
+		customInstructions,
+		fileLists: mergedFiles,
+	});
 
 	const requestHistorySummary = async (
 		mode: SummaryMode,
@@ -256,24 +265,25 @@ export async function handleBeforeCompact(
 			historyResult.maxTokens,
 			historyResult.maxTokens + turnPrefixResult.maxTokens,
 		);
-		const size = validateSummarySize({ summary, tokensBefore, maxTokens });
-		if (!size.ok) {
+		const commit = commitVerifiedCompaction({
+			plan,
+			summary,
+			maxTokens,
+		});
+		if (!commit.ok) {
+			const reason = commit.verification.issues.includes("invalid-result")
+				? "invalid-result"
+				: commit.verification.issues.includes("too-long")
+					? "too-long"
+					: "verification-failed";
 			return {
 				ok: false,
 				mode,
-				reason: "too-long",
-				message: `${size.estimatedTokens} estimated tokens exceeds ${size.maxAllowedTokens}`,
+				reason,
+				message: commit.verification.message,
 			};
 		}
-
-		const compaction = buildValidatedCompaction({
-			summary,
-			firstKeptEntryId,
-			tokensBefore,
-			details: mergedFiles,
-		});
-		if (!compaction) return { ok: false, mode, reason: "invalid-result" };
-		return { ok: true, compaction, mode };
+		return { ok: true, compaction: commit.compaction, mode };
 	};
 
 	try {
@@ -315,6 +325,8 @@ function fallbackMessageForSummaryFailure(result: SummaryAttemptFailure): string
 			return `Autocompact v2 summary was too long${result.message ? ` (${result.message})` : ""}; using default compaction.`;
 		case "invalid-result":
 			return "Autocompact v2 produced an invalid summary result; using default compaction.";
+		case "verification-failed":
+			return `Autocompact v2 summary failed plan verification${result.message ? ` (${result.message})` : ""}; using default compaction.`;
 		default:
 			return "Autocompact v2 summary request failed; using default compaction.";
 	}
