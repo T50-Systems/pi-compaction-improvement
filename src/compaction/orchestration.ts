@@ -1,30 +1,17 @@
-import type { SummaryMode } from "../prompt.ts";
 import type { AutoCompactState } from "../state.ts";
-import {
-	formatFileOperations,
-	mergeFileLists,
-	parseFileLists,
-	stripFileTags,
-} from "../file-tags.ts";
-import { computeFileLists } from "./file-operations.ts";
-import { parseBeforeCompactEvent } from "./event-guard.ts";
+import { mergeFileLists, parseFileLists } from "../file-tags.ts";
 import { buildCompactionPlan } from "./compaction-plan.ts";
-import {
-	buildNoPriorHistorySummary,
-	buildSummaryRequest,
-	buildTurnPrefixSummaryRequest,
-	calculateSummaryMaxTokens,
-	calculateTurnPrefixMaxTokens,
-	formatSplitTurnSummary,
-} from "./summary-request.ts";
-import {
-	requestSummary,
-	type SummaryProviderInput,
-} from "./summary-provider.ts";
-import { commitVerifiedCompaction } from "./compaction-workflow.ts";
-import { validateSummaryStructure } from "./summary-structure-guard.ts";
-import { notify } from "./telemetry.ts";
+import { parseBeforeCompactEvent } from "./event-guard.ts";
+import { computeFileLists } from "./file-operations.ts";
 import type { NotifyContextPort } from "./ports.ts";
+import {
+	runSummaryAttemptPipeline,
+	shouldRetrySummaryFailure,
+	type SummaryAttemptFailure,
+	type SummaryAttemptResult,
+} from "./summary-pipeline.ts";
+import { type SummaryProviderInput } from "./summary-provider.ts";
+import { notify } from "./telemetry.ts";
 import type { ValidatedExtensionCompaction } from "./types.ts";
 
 interface SummaryContextPort extends NotifyContextPort {
@@ -37,34 +24,6 @@ interface SummaryContextPort extends NotifyContextPort {
 }
 
 type CompactionResult = ValidatedExtensionCompaction | undefined;
-
-type SummaryAttemptFailure =
-	| {
-			reason: "empty" | "provider-error" | "timeout" | "aborted";
-			message?: string;
-	  }
-	| {
-			reason: "invalid-structure" | "too-long" | "invalid-result" | "verification-failed";
-			message?: string;
-	  };
-
-type SummaryFragmentResult =
-	| { ok: true; summary: string; maxTokens: number }
-	| ({ ok: false } & SummaryAttemptFailure);
-
-type SummaryAttemptResult =
-	| { ok: true; compaction: NonNullable<CompactionResult>; mode: SummaryMode }
-	| ({ ok: false; mode: SummaryMode } & SummaryAttemptFailure);
-
-function shouldRetrySummaryFailure(result: SummaryAttemptResult): boolean {
-	return (
-		!result.ok &&
-		(result.reason === "empty" ||
-			result.reason === "invalid-structure" ||
-			result.reason === "too-long") &&
-		result.mode !== "aggressive"
-	);
-}
 
 export async function handleBeforeCompact(
 	event: unknown,
@@ -81,10 +40,6 @@ export async function handleBeforeCompact(
 		return;
 	}
 
-	const { preparation, signal, customInstructions, reason, willRetry } =
-		safeEvent;
-	const { firstKeptEntryId, tokensBefore, previousSummary, fileOps, settings } =
-		preparation;
 	const model = ctx.model;
 	if (!model) {
 		notify(
@@ -105,14 +60,16 @@ export async function handleBeforeCompact(
 		return;
 	}
 
+	const { preparation, signal, customInstructions, reason, willRetry } =
+		safeEvent;
 	const allMessages = [
 		...preparation.messagesToSummarize,
 		...preparation.turnPrefixMessages,
 	];
 	if (allMessages.length === 0) return;
 
-	const previousFiles = parseFileLists(previousSummary);
-	const currentFiles = computeFileLists(fileOps);
+	const previousFiles = parseFileLists(preparation.previousSummary);
+	const currentFiles = computeFileLists(preparation.fileOps);
 	const mergedFiles = mergeFileLists(previousFiles, currentFiles);
 	const plan = buildCompactionPlan({
 		preparation,
@@ -123,183 +80,39 @@ export async function handleBeforeCompact(
 		fileLists: mergedFiles,
 	});
 
-	const requestHistorySummary = async (
-		mode: SummaryMode,
-		forceMode?: SummaryMode,
-	): Promise<SummaryFragmentResult> => {
-		if (preparation.messagesToSummarize.length === 0) {
-			return {
-				ok: true,
-				summary: stripFileTags(previousSummary ?? buildNoPriorHistorySummary()),
-				maxTokens: calculateSummaryMaxTokens({
-					reserveTokens: settings.reserveTokens,
-					modelMaxTokens: model.maxTokens,
-					mode,
-				}),
-			};
-		}
-
-		const { promptText } = buildSummaryRequest({
-			preparation,
-			state,
-			customInstructions,
-			reason,
-			willRetry,
-			forceMode,
-		});
-		const maxTokens = calculateSummaryMaxTokens({
-			reserveTokens: settings.reserveTokens,
-			modelMaxTokens: model.maxTokens,
-			mode,
-		});
-		const summaryResult = await requestSummary({
-			model,
-			auth,
-			promptText,
-			maxTokens,
-			signal,
-		});
-		if (!summaryResult.ok) {
-			return {
-				ok: false,
-				reason: summaryResult.reason,
-				message: summaryResult.message,
-			};
-		}
-		return {
-			ok: true,
-			summary: stripFileTags(summaryResult.summary),
-			maxTokens,
-		};
-	};
-
-	const requestTurnPrefixSummary = async (): Promise<SummaryFragmentResult> => {
-		if (preparation.turnPrefixMessages.length === 0) {
-			return { ok: true, summary: "", maxTokens: 0 };
-		}
-		const { promptText } = buildTurnPrefixSummaryRequest({ preparation });
-		const maxTokens = calculateTurnPrefixMaxTokens({
-			reserveTokens: settings.reserveTokens,
-			modelMaxTokens: model.maxTokens,
-		});
-		const summaryResult = await requestSummary({
-			model,
-			auth,
-			promptText,
-			maxTokens,
-			signal,
-		});
-		if (!summaryResult.ok) {
-			return {
-				ok: false,
-				reason: summaryResult.reason,
-				message: summaryResult.message,
-			};
-		}
-		return {
-			ok: true,
-			summary: stripFileTags(summaryResult.summary),
-			maxTokens,
-		};
-	};
-
-	const summarize = async (
-		forceMode?: SummaryMode,
-	): Promise<SummaryAttemptResult> => {
-		const { mode } = buildSummaryRequest({
-			preparation,
-			state,
-			customInstructions,
-			reason,
-			willRetry,
-			forceMode,
-		});
-		notify(
-			ctx,
-			`Autocompact v2: summarizing ${allMessages.length} messages with ${model.provider}/${model.id} (${mode}).`,
-			"info",
-		);
-
-		const historyResult = await requestHistorySummary(mode, forceMode);
-		if (!historyResult.ok) {
-			return {
-				ok: false,
-				mode,
-				reason: historyResult.reason,
-				message: historyResult.message,
-			};
-		}
-
-		const structure = validateSummaryStructure(historyResult.summary);
-		if (!structure.ok) {
-			return {
-				ok: false,
-				mode,
-				reason: "invalid-structure",
-				message: structure.issues.join(", "),
-			};
-		}
-
-		const turnPrefixResult = await requestTurnPrefixSummary();
-		if (!turnPrefixResult.ok) {
-			return {
-				ok: false,
-				mode,
-				reason: turnPrefixResult.reason,
-				message: turnPrefixResult.message,
-			};
-		}
-
-		let summary = turnPrefixResult.summary
-			? formatSplitTurnSummary({
-					historySummary: historyResult.summary,
-					turnPrefixSummary: turnPrefixResult.summary,
-				})
-			: historyResult.summary;
-		summary += formatFileOperations(
-			mergedFiles.readFiles,
-			mergedFiles.modifiedFiles,
-		);
-
-		const maxTokens = Math.max(
-			historyResult.maxTokens,
-			historyResult.maxTokens + turnPrefixResult.maxTokens,
-		);
-		const commit = commitVerifiedCompaction({
-			plan,
-			summary,
-			maxTokens,
-		});
-		if (!commit.ok) {
-			const reason = commit.verification.issues.includes("invalid-result")
-				? "invalid-result"
-				: commit.verification.issues.includes("too-long")
-					? "too-long"
-					: "verification-failed";
-			return {
-				ok: false,
-				mode,
-				reason,
-				message: commit.verification.message,
-			};
-		}
-		return { ok: true, compaction: commit.compaction, mode };
-	};
-
 	try {
-		const firstAttempt = await summarize();
+		const firstAttempt = await runSummaryAttemptPipeline({
+			preparation,
+			state,
+			plan,
+			fileLists: mergedFiles,
+			customInstructions,
+			reason,
+			willRetry,
+			model,
+			auth,
+			signal,
+			onNotify: (message) => notify(ctx, message, "info"),
+		});
 		const finalAttempt = shouldRetrySummaryFailure(firstAttempt)
-			? await summarize("aggressive")
+			? await runSummaryAttemptPipeline({
+					preparation,
+					state,
+					plan,
+					fileLists: mergedFiles,
+					customInstructions,
+					reason,
+					willRetry,
+					model,
+					auth,
+					signal,
+					forceMode: "aggressive",
+					onNotify: (message) => notify(ctx, message, "info"),
+				})
 			: firstAttempt;
 		if (finalAttempt.ok) return finalAttempt.compaction;
 
-		if (finalAttempt.reason !== "aborted") {
-			notify(
-				ctx,
-				fallbackMessageForSummaryFailure(finalAttempt),
-				finalAttempt.reason === "provider-error" ? "error" : "warning",
-			);
-		}
+		notifySummaryFailure(ctx, finalAttempt);
 		return;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -307,6 +120,18 @@ export async function handleBeforeCompact(
 			notify(ctx, `Autocompact v2 failed: ${message}`, "error");
 		return;
 	}
+}
+
+function notifySummaryFailure(
+	ctx: SummaryContextPort,
+	result: SummaryAttemptResult,
+): void {
+	if (result.ok || result.reason === "aborted") return;
+	notify(
+		ctx,
+		fallbackMessageForSummaryFailure(result),
+		result.reason === "provider-error" ? "error" : "warning",
+	);
 }
 
 function fallbackMessageForSummaryFailure(result: SummaryAttemptFailure): string {

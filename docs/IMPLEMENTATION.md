@@ -51,3 +51,7 @@ Covered by unit tests for:
 - prompt generation
 - file tag handling
 - tool-result size estimation
+
+## Architecture reference
+
+The current summary path is documented in [`ARCHITECTURE.md`](ARCHITECTURE.md). In short: `orchestration.ts` handles event/auth/plan setup, `summary-pipeline.ts` runs the pipe-and-filter production path, `lifecycle-state-machine.ts` guards phase transitions, and `compaction-workflow.ts` owns contract verification before returning a compaction result.
