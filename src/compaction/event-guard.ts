@@ -9,11 +9,29 @@ function toStringOrUndefined(value: unknown): string | undefined {
 }
 
 function toFiniteNumberOrUndefined(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
+}
+
+function toBoolean(value: unknown): boolean {
+	return value === true;
+}
+
+function normalizeCompactionReason(
+	value: unknown,
+): "manual" | "overflow" | "threshold" {
+	if (value === "manual" || value === "manual-now") return "manual";
+	if (value === "overflow" || value === "emergency-near-limit")
+		return "overflow";
+	return "threshold";
 }
 
 export function normalizeStringSet(value: unknown): Set<string> {
-	if (!value || typeof (value as Iterable<unknown>)[Symbol.iterator] !== "function") {
+	if (
+		!value ||
+		typeof (value as Iterable<unknown>)[Symbol.iterator] !== "function"
+	) {
 		return new Set();
 	}
 	return new Set(
@@ -40,7 +58,9 @@ export function isAbortSignalLike(value: unknown): value is AbortSignal {
 	);
 }
 
-export function parseBeforeCompactEvent(event: unknown): SafeBeforeCompactEvent | undefined {
+export function parseBeforeCompactEvent(
+	event: unknown,
+): SafeBeforeCompactEvent | undefined {
 	if (!isRecord(event) || !isRecord(event.preparation)) return undefined;
 
 	const preparation = event.preparation;
@@ -55,7 +75,11 @@ export function parseBeforeCompactEvent(event: unknown): SafeBeforeCompactEvent 
 		? toFiniteNumberOrUndefined(preparation.settings.reserveTokens)
 		: undefined;
 
-	if (!messagesToSummarize || !turnPrefixMessages || tokensBefore === undefined) {
+	if (
+		!messagesToSummarize ||
+		!turnPrefixMessages ||
+		tokensBefore === undefined
+	) {
 		return undefined;
 	}
 
@@ -71,6 +95,8 @@ export function parseBeforeCompactEvent(event: unknown): SafeBeforeCompactEvent 
 		},
 		signal: isAbortSignalLike(event.signal) ? event.signal : undefined,
 		customInstructions: toStringOrUndefined(event.customInstructions),
+		reason: normalizeCompactionReason(event.reason),
+		willRetry: toBoolean(event.willRetry),
 	};
 }
 

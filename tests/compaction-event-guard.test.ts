@@ -27,7 +27,9 @@ describe("compaction event guard", () => {
 
 	it("returns undefined for invalid legacy event shapes", () => {
 		expect(parseBeforeCompactEvent({ signal: undefined })).toBeUndefined();
-		expect(parseBeforeCompactEvent({ preparation: { tokensBefore: 1 } })).toBeUndefined();
+		expect(
+			parseBeforeCompactEvent({ preparation: { tokensBefore: 1 } }),
+		).toBeUndefined();
 	});
 
 	it("accepts legacy events without signal", () => {
@@ -46,6 +48,25 @@ describe("compaction event guard", () => {
 		expect(event?.signal).toBeUndefined();
 		expect(event?.customInstructions).toBe("focus");
 		expect(event?.preparation.firstKeptEntryId).toBe("entry-1");
-		expect([...event?.preparation.fileOps.read ?? []]).toEqual(["README.md"]);
+		expect([...(event?.preparation.fileOps.read ?? [])]).toEqual(["README.md"]);
+		expect(event?.reason).toBe("threshold");
+		expect(event?.willRetry).toBe(false);
+	});
+
+	it("preserves retry-oriented compaction metadata", () => {
+		const event = parseBeforeCompactEvent({
+			reason: "emergency-near-limit",
+			willRetry: true,
+			preparation: {
+				messagesToSummarize: [{ role: "user" }],
+				turnPrefixMessages: [],
+				firstKeptEntryId: "entry-1",
+				tokensBefore: 1000,
+				settings: {},
+			},
+		});
+
+		expect(event?.reason).toBe("overflow");
+		expect(event?.willRetry).toBe(true);
 	});
 });

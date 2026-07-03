@@ -11,7 +11,49 @@ vi.mock("@earendil-works/pi-ai/compat", () => ({
 }));
 import extension from "../extensions/index.ts";
 
-type ExtensionHandler = (event: unknown, ctx: unknown) => Promise<void>;
+type ExtensionHandler = (event: unknown, ctx: unknown) => Promise<unknown>;
+
+function structuredSummary(body = "useful summary"): string {
+	return [
+		"## Goal",
+		body,
+		"",
+		"## Constraints & Preferences",
+		"- Keep working safely.",
+		"",
+		"## Progress",
+		"### Done",
+		"- [x] Summarized prior context.",
+		"",
+		"### In Progress",
+		"- [ ] Continue implementation.",
+		"",
+		"### Blocked",
+		"- None.",
+		"",
+		"## Key Decisions",
+		"- Preserve exact paths.",
+		"",
+		"## Discarded Hypotheses",
+		"- None.",
+		"",
+		"## Risks",
+		"- None.",
+		"",
+		"## Immediate Next Action",
+		"1. Continue with the next validation step.",
+		"",
+		"## Continuation Contract",
+		"- Resume automatically after compaction: yes",
+		"- If no, ask the user exactly this: N/A",
+		"",
+		"## Next Steps",
+		"1. Validate the implementation.",
+		"",
+		"## Critical Context",
+		"- tests/extension-before-compact.test.ts",
+	].join("\n");
+}
 
 function registerExtension(): Map<string, ExtensionHandler> {
 	const handlers = new Map<string, ExtensionHandler>();
@@ -129,7 +171,7 @@ describe("session_before_compact summarization", () => {
 		const handlers = registerExtension();
 		const ctx = makeContext(await writeTriggerConfig());
 		vi.mocked(complete).mockResolvedValueOnce({
-			content: [{ type: "text", text: " useful summary " }],
+			content: [{ type: "text", text: structuredSummary("useful summary") }],
 		} as never);
 
 		const result = await handlers.get("session_before_compact")?.(
@@ -151,7 +193,7 @@ describe("session_before_compact summarization", () => {
 		const handlers = registerExtension();
 		const ctx = makeContext(await writeTriggerConfig());
 		vi.mocked(complete).mockResolvedValueOnce({
-			content: [{ type: "text", text: "summary" }],
+			content: [{ type: "text", text: structuredSummary() }],
 		} as never);
 
 		const result = await handlers.get("session_before_compact")?.(
@@ -172,7 +214,7 @@ describe("session_before_compact summarization", () => {
 		const handlers = registerExtension();
 		const ctx = makeContext(await writeTriggerConfig());
 		vi.mocked(complete).mockResolvedValueOnce({
-			content: [{ type: "text", text: "summary" }],
+			content: [{ type: "text", text: structuredSummary() }],
 		} as never);
 
 		const result = await handlers.get("session_before_compact")?.(
@@ -196,6 +238,42 @@ describe("session_before_compact summarization", () => {
 				},
 			}),
 		});
+	});
+
+	it("retries once with aggressive mode when the summary structure is invalid", async () => {
+		const handlers = registerExtension();
+		const ctx = makeContext(await writeTriggerConfig());
+		vi.mocked(complete)
+			.mockResolvedValueOnce({
+				content: [{ type: "text", text: "loose prose summary" }],
+			} as never)
+			.mockResolvedValueOnce({
+				content: [{ type: "text", text: structuredSummary("retry summary") }],
+			} as never);
+
+		const result = await handlers.get("session_before_compact")?.(
+			makeBeforeCompactEvent(),
+			ctx,
+		);
+
+		expect(
+			(result as { compaction?: { summary?: string } } | undefined)?.compaction
+				?.summary,
+		).toContain("retry summary");
+		expect(complete).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(complete).mock.calls[1]?.[1]).toEqual(
+			expect.objectContaining({
+				messages: expect.arrayContaining([
+					expect.objectContaining({
+						content: expect.arrayContaining([
+							expect.objectContaining({
+								text: expect.stringContaining("mode=aggressive"),
+							}),
+						]),
+					}),
+				]),
+			}),
+		);
 	});
 
 	it("times out a hanging summary request and falls back to default compaction", async () => {

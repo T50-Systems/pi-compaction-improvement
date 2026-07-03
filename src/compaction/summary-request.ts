@@ -6,11 +6,15 @@ import {
 	buildSummarizationPrompt,
 	resolveSummaryMode,
 	stripAutocompactDirectives,
+	type SummaryMode,
 } from "../prompt.ts";
 import type { AutoCompactState } from "../state.ts";
-import type { SafeCompactionPreparation } from "./types.ts";
+import type {
+	SafeCompactionPreparation,
+	SafeCompactionReason,
+} from "./types.ts";
 
-export type SummaryReason = "manual" | "overflow" | "threshold";
+export type SummaryReason = SafeCompactionReason;
 
 export function resolveSummaryReason(state: AutoCompactState): SummaryReason {
 	if (state.lastCompactionReason === "manual-now") return "manual";
@@ -18,28 +22,65 @@ export function resolveSummaryReason(state: AutoCompactState): SummaryReason {
 	return "threshold";
 }
 
+function serializeMessages(messages: unknown[]): string {
+	return serializeConversation(convertToLlm(messages as never));
+}
+
+function safeTaggedBlock(tag: string, value: string): string {
+	const escaped = value.replaceAll(`</${tag}>`, `<\\/${tag}>`);
+	return `<${tag}>\n${escaped}\n</${tag}>`;
+}
+
 export function buildSummaryRequest(input: {
 	preparation: SafeCompactionPreparation;
 	state: AutoCompactState;
 	customInstructions?: string;
-}): { allMessages: unknown[]; promptText: string; reason: SummaryReason } {
+	reason?: SummaryReason;
+	willRetry?: boolean;
+	forceMode?: SummaryMode;
+}): {
+	allMessages: unknown[];
+	promptText: string;
+	reason: SummaryReason;
+	mode: SummaryMode;
+} {
 	const { preparation, state, customInstructions } = input;
 	const allMessages = [
 		...preparation.messagesToSummarize,
 		...preparation.turnPrefixMessages,
 	];
-	const reason = resolveSummaryReason(state);
-	const mode = resolveSummaryMode({
-		reason,
-		willRetry: false,
-		customInstructions,
-	});
-	const promptText = [
-		`<conversation>\n${serializeConversation(convertToLlm(allMessages as never))}\n</conversation>`,
-		preparation.previousSummary
-			? `<previous-summary>\n${preparation.previousSummary}\n</previous-summary>`
+	const reason = input.reason ?? resolveSummaryReason(state);
+	const mode =
+		input.forceMode ??
+		resolveSummaryMode({
+			reason,
+			willRetry: input.willRetry ?? false,
+			customInstructions,
+		});
+	const blocks = [
+		safeTaggedBlock(
+			"messages-to-summarize",
+			serializeMessages(preparation.messagesToSummarize),
+		),
+		preparation.turnPrefixMessages.length > 0
+			? safeTaggedBlock(
+					"retained-turn-prefix",
+					serializeMessages(preparation.turnPrefixMessages),
+				)
 			: "",
-		`<compaction-context>\nreason=${reason}\nmode=${mode}\nsplitTurn=${String(preparation.turnPrefixMessages.length > 0)}\ntrigger=${state.lastCompactionReason ?? "unknown"}\n</compaction-context>`,
+		preparation.previousSummary
+			? safeTaggedBlock("previous-summary", preparation.previousSummary)
+			: "",
+		safeTaggedBlock(
+			"compaction-context",
+			[
+				`reason=${reason}`,
+				`mode=${mode}`,
+				`willRetry=${String(input.willRetry ?? false)}`,
+				`splitTurn=${String(preparation.turnPrefixMessages.length > 0)}`,
+				`trigger=${state.lastCompactionReason ?? "unknown"}`,
+			].join("\n"),
+		),
 		buildSummarizationPrompt({
 			mode,
 			previousSummary: Boolean(preparation.previousSummary),
@@ -49,15 +90,17 @@ export function buildSummaryRequest(input: {
 	]
 		.filter(Boolean)
 		.join("\n\n");
-	return { allMessages, promptText, reason };
+	return { allMessages, promptText: blocks, reason, mode };
 }
 
 export function calculateSummaryMaxTokens(input: {
 	reserveTokens: number;
 	modelMaxTokens: number;
+	mode?: SummaryMode;
 }): number {
+	const reserveRatio = input.mode === "aggressive" ? 0.55 : 0.8;
 	return Math.min(
-		Math.floor(0.8 * input.reserveTokens),
+		Math.floor(reserveRatio * input.reserveTokens),
 		input.modelMaxTokens > 0 ? input.modelMaxTokens : Number.POSITIVE_INFINITY,
 	);
 }

@@ -1,6 +1,14 @@
-import type { AutoCompactState, CompactionPhase, StatusSnapshot } from "../state.ts";
+import type {
+	AutoCompactState,
+	CompactionPhase,
+	StatusSnapshot,
+} from "../state.ts";
 
-export type { AutoCompactState, CompactionPhase, StatusSnapshot } from "../state.ts";
+export type {
+	AutoCompactState,
+	CompactionPhase,
+	StatusSnapshot,
+} from "../state.ts";
 
 export interface FileOperationsLike {
 	read: Set<string>;
@@ -18,10 +26,14 @@ export interface SafeCompactionPreparation {
 	settings: { reserveTokens: number };
 }
 
+export type SafeCompactionReason = "manual" | "overflow" | "threshold";
+
 export interface SafeBeforeCompactEvent {
 	preparation: SafeCompactionPreparation;
 	signal: AbortSignal | undefined;
 	customInstructions: string | undefined;
+	reason: SafeCompactionReason;
+	willRetry: boolean;
 }
 
 export interface FileListDetails {

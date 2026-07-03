@@ -45,9 +45,10 @@ describe("summary request", () => {
 
 		expect(request.reason).toBe("manual");
 		expect(request.allMessages).toHaveLength(1);
-		expect(request.promptText).toContain("<conversation>");
+		expect(request.promptText).toContain("<messages-to-summarize>");
 		expect(request.promptText).toContain("old summary");
 		expect(request.promptText).toContain("reason=manual");
+		expect(request.promptText).toContain("willRetry=false");
 	});
 
 	it("caps max tokens by reserve and model limit", () => {
@@ -60,5 +61,25 @@ describe("summary request", () => {
 		expect(
 			calculateSummaryMaxTokens({ reserveTokens: 1000, modelMaxTokens: 500 }),
 		).toBe(500);
+	});
+
+	it("uses aggressive mode and lower output budget for retry compaction", () => {
+		const state = createInitialState();
+		const request = buildSummaryRequest({
+			preparation: preparation(),
+			state,
+			reason: "threshold",
+			willRetry: true,
+		});
+
+		expect(request.mode).toBe("aggressive");
+		expect(request.promptText).toContain("willRetry=true");
+		expect(
+			calculateSummaryMaxTokens({
+				reserveTokens: 1000,
+				modelMaxTokens: 10_000,
+				mode: request.mode,
+			}),
+		).toBe(550);
 	});
 });

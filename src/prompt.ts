@@ -1,16 +1,16 @@
 export type SummaryMode = "standard" | "focused" | "aggressive";
 
 export interface ResolveSummaryModeInput {
-  reason: "manual" | "threshold" | "overflow";
-  willRetry: boolean;
-  customInstructions?: string;
+	reason: "manual" | "threshold" | "overflow";
+	willRetry: boolean;
+	customInstructions?: string;
 }
 
 export interface BuildPromptInput {
-  mode: SummaryMode;
-  previousSummary: boolean;
-  customInstructions?: string;
-  hasSplitTurn: boolean;
+	mode: SummaryMode;
+	previousSummary: boolean;
+	customInstructions?: string;
+	hasSplitTurn: boolean;
 }
 
 const MODE_MARKER = /\[AUTOCOMPACT_MODE=(standard|focused|aggressive)\]/i;
@@ -56,81 +56,98 @@ const TEMPLATE = `## Goal
 - [Exact file paths, functions, commands, errors, or facts needed to continue]
 - [(none) if not applicable]`;
 
-export function extractForcedMode(customInstructions?: string): SummaryMode | undefined {
-  const match = MODE_MARKER.exec(customInstructions ?? "");
-  return match?.[1]?.toLowerCase() as SummaryMode | undefined;
+export function extractForcedMode(
+	customInstructions?: string,
+): SummaryMode | undefined {
+	const match = MODE_MARKER.exec(customInstructions ?? "");
+	return match?.[1]?.toLowerCase() as SummaryMode | undefined;
 }
 
-export function stripAutocompactDirectives(customInstructions?: string): string | undefined {
-  const cleaned = (customInstructions ?? "")
-    .replace(MODE_MARKER, "")
-    .replace(REASON_MARKER, "")
-    .trim();
-  return cleaned || undefined;
+export function stripAutocompactDirectives(
+	customInstructions?: string,
+): string | undefined {
+	const cleaned = (customInstructions ?? "")
+		.replace(MODE_MARKER, "")
+		.replace(REASON_MARKER, "")
+		.trim();
+	return cleaned || undefined;
 }
 
-export function resolveSummaryMode(input: ResolveSummaryModeInput): SummaryMode {
-  const forcedMode = extractForcedMode(input.customInstructions);
-  if (forcedMode) return forcedMode;
-  if (input.reason === "overflow" || input.willRetry) return "aggressive";
-  if (stripAutocompactDirectives(input.customInstructions)) return "focused";
-  return "standard";
+export function resolveSummaryMode(
+	input: ResolveSummaryModeInput,
+): SummaryMode {
+	const forcedMode = extractForcedMode(input.customInstructions);
+	if (forcedMode) return forcedMode;
+	if (input.reason === "overflow" || input.willRetry) return "aggressive";
+	if (stripAutocompactDirectives(input.customInstructions)) return "focused";
+	return "standard";
 }
 
 export function buildSummarizationPrompt(input: BuildPromptInput): string {
-  const intro = input.previousSummary
-    ? "Update the existing structured summary using the new conversation material. Preserve still-relevant prior context, move completed items into Done, and refresh the current action state."
-    : "Create a structured context checkpoint summary that another agent can use to continue the work with minimal re-reading.";
+	const intro = input.previousSummary
+		? "Update the existing structured summary using the new conversation material. Preserve still-relevant prior context, move completed items into Done, and refresh the current action state."
+		: "Create a structured context checkpoint summary that another agent can use to continue the work with minimal re-reading.";
 
-  const commonRules = [
-    "Prefer conclusions over chronology.",
-    "Preserve exact file paths, function names, commands, and error messages when they matter.",
-    "Do not copy long logs; keep only the relevant error text and the conclusion.",
-    "Record discarded hypotheses only when they prevent repeated work.",
-    "Separate immediate blockers from broader risks.",
-    "Immediate Next Action must contain exactly one concrete first step.",
-    "Continuation Contract must say whether the agent should resume automatically after compaction.",
-    "Set Resume automatically to yes unless progress is blocked by missing user input, approval, credentials, or an external dependency.",
-    "If Resume automatically is yes, phrase the next action as an executable instruction, not a question or status recap.",
-    "Keep the summary concise but operationally complete.",
-  ];
+	const commonRules = [
+		"Prefer conclusions over chronology.",
+		"Preserve exact file paths, function names, commands, and error messages when they matter.",
+		"Do not copy long logs; keep only the relevant error text and the conclusion.",
+		"Record discarded hypotheses only when they prevent repeated work.",
+		"Separate immediate blockers from broader risks.",
+		"Immediate Next Action must contain exactly one concrete first step.",
+		"Continuation Contract must say whether the agent should resume automatically after compaction.",
+		"Set Resume automatically to yes unless progress is blocked by missing user input, approval, credentials, or an external dependency.",
+		"If Resume automatically is yes, phrase the next action as an executable instruction, not a question or status recap.",
+		"Keep the summary concise but operationally complete.",
+	];
 
-  const modeRules: Record<SummaryMode, string[]> = {
-    standard: [
-      "Optimize for balanced continuity: enough detail to resume work, without narrating the full history.",
-    ],
-    focused: [
-      "Give extra weight to the current task, current blockers, and the user's custom focus instructions.",
-    ],
-    aggressive: [
-      "Compress aggressively for recovery from context pressure while preserving only the information needed to continue safely.",
-      "Minimize narration and repetition.",
-    ],
-  };
+	const budgetRules = [
+		"Budget by section: keep Goal and Continuation Contract short; spend detail on Critical Context, Blocked, and Immediate Next Action.",
+		"Do not let narrative history crowd out exact commands, paths, errors, pending validation, or the next executable step.",
+		input.mode === "aggressive"
+			? "Aggressive mode budget: minimize Done and Key Decisions; prioritize Blocked, Critical Context, Immediate Next Action, and Resume automatically."
+			: "Standard mode budget: preserve enough Done and Key Decisions to prevent repeated work, but avoid chronological narration.",
+	];
 
-  const splitTurnRule = input.hasSplitTurn
-    ? [
-        "Part of the current turn is retained outside this summary. Capture only the prefix context needed to understand the kept recent suffix.",
-      ]
-    : [];
+	const modeRules: Record<SummaryMode, string[]> = {
+		standard: [
+			"Optimize for balanced continuity: enough detail to resume work, without narrating the full history.",
+		],
+		focused: [
+			"Give extra weight to the current task, current blockers, and the user's custom focus instructions.",
+		],
+		aggressive: [
+			"Compress aggressively for recovery from context pressure while preserving only the information needed to continue safely.",
+			"Minimize narration and repetition.",
+		],
+	};
 
-  const cleanedInstructions = stripAutocompactDirectives(input.customInstructions);
+	const splitTurnRule = input.hasSplitTurn
+		? [
+				"Part of the current turn is retained outside this summary. Capture only the prefix context needed to understand the kept recent suffix.",
+			]
+		: [];
 
-  const customFocus = cleanedInstructions
-    ? [`Additional focus: ${cleanedInstructions}`]
-    : [];
+	const cleanedInstructions = stripAutocompactDirectives(
+		input.customInstructions,
+	);
 
-  return [
-    intro,
-    "",
-    "Rules:",
-    ...commonRules.map((rule) => `- ${rule}`),
-    ...modeRules[input.mode].map((rule) => `- ${rule}`),
-    ...splitTurnRule.map((rule) => `- ${rule}`),
-    ...customFocus.map((rule) => `- ${rule}`),
-    "",
-    "Use this exact structure:",
-    "",
-    TEMPLATE,
-  ].join("\n");
+	const customFocus = cleanedInstructions
+		? [`Additional focus: ${cleanedInstructions}`]
+		: [];
+
+	return [
+		intro,
+		"",
+		"Rules:",
+		...commonRules.map((rule) => `- ${rule}`),
+		...modeRules[input.mode].map((rule) => `- ${rule}`),
+		...budgetRules.map((rule) => `- ${rule}`),
+		...splitTurnRule.map((rule) => `- ${rule}`),
+		...customFocus.map((rule) => `- ${rule}`),
+		"",
+		"Use this exact structure:",
+		"",
+		TEMPLATE,
+	].join("\n");
 }
