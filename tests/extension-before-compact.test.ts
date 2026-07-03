@@ -276,6 +276,66 @@ describe("session_before_compact summarization", () => {
 		);
 	});
 
+	it("adds a dedicated split-turn context summary for turn prefix messages", async () => {
+		const handlers = registerExtension();
+		const ctx = makeContext(await writeTriggerConfig());
+		vi.mocked(complete)
+			.mockResolvedValueOnce({
+				content: [{ type: "text", text: structuredSummary("history summary") }],
+			} as never)
+			.mockResolvedValueOnce({
+				content: [{ type: "text", text: "prefix context summary" }],
+			} as never);
+
+		const result = await handlers.get("session_before_compact")?.(
+			makeBeforeCompactEvent({
+				preparation: {
+					turnPrefixMessages: [
+						{
+							role: "assistant",
+							content: [{ type: "text", text: "early work" }],
+						},
+					],
+				},
+			}),
+			ctx,
+		);
+
+		const summary = (
+			result as { compaction?: { summary?: string } } | undefined
+		)?.compaction?.summary;
+		expect(summary).toContain("history summary");
+		expect(summary).toContain("**Turn Context (split turn):**");
+		expect(summary).toContain("prefix context summary");
+		expect(complete).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(complete).mock.calls[0]?.[1]).toEqual(
+			expect.objectContaining({
+				messages: expect.arrayContaining([
+					expect.objectContaining({
+						content: expect.arrayContaining([
+							expect.objectContaining({
+								text: expect.not.stringContaining("<turn-prefix-messages>"),
+							}),
+						]),
+					}),
+				]),
+			}),
+		);
+		expect(vi.mocked(complete).mock.calls[1]?.[1]).toEqual(
+			expect.objectContaining({
+				messages: expect.arrayContaining([
+					expect.objectContaining({
+						content: expect.arrayContaining([
+							expect.objectContaining({
+								text: expect.stringContaining("<turn-prefix-messages>"),
+							}),
+						]),
+					}),
+				]),
+			}),
+		);
+	});
+
 	it("times out a hanging summary request and falls back to default compaction", async () => {
 		vi.useFakeTimers();
 		const handlers = registerExtension();

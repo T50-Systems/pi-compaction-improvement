@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createInitialState } from "../src/state.ts";
 import {
 	buildSummaryRequest,
+	buildTurnPrefixSummaryRequest,
 	calculateSummaryMaxTokens,
+	calculateTurnPrefixMaxTokens,
+	formatSplitTurnSummary,
 	resolveSummaryReason,
 } from "../src/compaction/summary-request.ts";
 import type { SafeCompactionPreparation } from "../src/compaction/types.ts";
@@ -81,5 +84,34 @@ describe("summary request", () => {
 				mode: request.mode,
 			}),
 		).toBe(550);
+	});
+
+	it("builds a dedicated turn-prefix prompt separate from history summary", () => {
+		const request = buildTurnPrefixSummaryRequest({
+			preparation: preparation({
+				turnPrefixMessages: [
+					{ role: "user", content: [{ type: "text", text: "large request" }] },
+				],
+			}),
+		});
+
+		expect(request.allMessages).toHaveLength(1);
+		expect(request.promptText).toContain("<turn-prefix-messages>");
+		expect(request.promptText).toContain("PREFIX of a turn");
+		expect(
+			calculateTurnPrefixMaxTokens({
+				reserveTokens: 1000,
+				modelMaxTokens: 10_000,
+			}),
+		).toBe(500);
+	});
+
+	it("formats split-turn summaries with the original turn context marker", () => {
+		expect(
+			formatSplitTurnSummary({
+				historySummary: "history",
+				turnPrefixSummary: "prefix",
+			}),
+		).toBe("history\n\n---\n\n**Turn Context (split turn):**\n\nprefix");
 	});
 });

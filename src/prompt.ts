@@ -19,6 +19,12 @@ const REASON_MARKER = /\[AUTOCOMPACT_REASON=([^\]]+)\]/gi;
 const TEMPLATE = `## Goal
 [What the user is trying to accomplish]
 
+## Active Goal Context
+- Objective: [Active objective if one exists; otherwise (none)]
+- Acceptance: [Acceptance criteria, success criteria, or definition of done if present]
+- Current: [Current goal/task state if present]
+- Blocked: [Goal-level blockers if present]
+
 ## Constraints & Preferences
 - [Requirements, constraints, or preferences from the user]
 - [(none) if there are none]
@@ -91,6 +97,9 @@ export function buildSummarizationPrompt(input: BuildPromptInput): string {
 	const commonRules = [
 		"Prefer conclusions over chronology.",
 		"Preserve exact file paths, function names, commands, and error messages when they matter.",
+		"Preserve any active objective, goal, plan, acceptance criteria, success criteria, progress state, blockers, and next action found in the conversation, regardless of which extension or tool produced it.",
+		"Treat goal/progress blocks as durable continuation context: copy their current meaning into Active Goal Context, Progress, Blocked, Immediate Next Action, and Critical Context as appropriate.",
+		"Do not mention or depend on any specific goal extension; summarize goal-like context using neutral wording.",
 		"Do not copy long logs; keep only the relevant error text and the conclusion.",
 		"Record discarded hypotheses only when they prevent repeated work.",
 		"Separate immediate blockers from broader risks.",

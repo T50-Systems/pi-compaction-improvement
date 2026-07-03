@@ -12,6 +12,15 @@ export function triggerScheduledCompaction(
 	customInstructions?: string,
 ): void {
 	try {
+		if (ctx.signal) {
+			noteCompactionFailed(state);
+			notify(
+				ctx,
+				"Autocompact v2 skipped because the session still has an active abort signal.",
+				"warning",
+			);
+			return;
+		}
 		noteCompactionTriggering(state);
 		ctx.compact({
 			customInstructions,

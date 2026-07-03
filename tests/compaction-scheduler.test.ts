@@ -25,6 +25,7 @@ function baseContext() {
 		hasPendingMessages: vi.fn(() => false),
 		hasUI: true,
 		isIdle: vi.fn(() => true),
+		signal: undefined as AbortSignal | undefined,
 		ui: { notify: vi.fn() },
 	};
 }
@@ -102,6 +103,48 @@ describe("compaction scheduler", () => {
 
 		expect(ctx.compact).not.toHaveBeenCalled();
 		expect(state.compactInFlight).toBe(false);
+		expect(state.compactionPhase).toBe("failed");
+		expect(ctx.ui.notify).toHaveBeenCalledWith(
+			"Autocompact v2 skipped because the session never became idle after agent completion.",
+			"warning",
+		);
+	});
+
+	it("defers scheduled compaction while an abort signal is still active", () => {
+		vi.useFakeTimers();
+		const state = createInitialState();
+		noteCompactionRequested(state, 1, "soft-threshold");
+		const schedule = createScheduledAutocompact();
+		const controller = new AbortController();
+		const ctx = makeContext({ signal: controller.signal });
+
+		scheduleAutocompact(ctx as never, state, schedule, {
+			turnIndex: 1,
+			reason: "soft-threshold",
+		});
+		vi.advanceTimersByTime(AUTOCOMPACT_INITIAL_DEFER_MS);
+
+		expect(ctx.compact).not.toHaveBeenCalled();
+		ctx.signal = undefined;
+		vi.advanceTimersByTime(25);
+
+		expect(ctx.compact).toHaveBeenCalledTimes(1);
+	});
+
+	it("skips safely if the trigger still sees an active abort signal", () => {
+		vi.useFakeTimers();
+		const state = createInitialState();
+		noteCompactionRequested(state, 1, "soft-threshold");
+		const schedule = createScheduledAutocompact();
+		const ctx = makeContext({ signal: new AbortController().signal });
+
+		scheduleAutocompact(ctx as never, state, schedule, {
+			turnIndex: 1,
+			reason: "soft-threshold",
+		});
+		vi.runAllTimers();
+
+		expect(ctx.compact).not.toHaveBeenCalled();
 		expect(state.compactionPhase).toBe("failed");
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
 			"Autocompact v2 skipped because the session never became idle after agent completion.",

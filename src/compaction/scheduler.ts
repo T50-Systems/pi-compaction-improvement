@@ -45,7 +45,7 @@ export function scheduleAutocompact(
 		if (!isCurrentScheduledCompaction(state, schedule, options, generation))
 			return;
 
-		if (!ctx.isIdle() || ctx.hasPendingMessages()) {
+		if (!ctx.isIdle() || ctx.hasPendingMessages() || ctx.signal) {
 			if (schedule.attempts < MAX_AUTOCOMPACT_DEFER_ATTEMPTS) {
 				schedule.attempts += 1;
 				schedule.timeout = setTimeout(run, AUTOCOMPACT_DEFER_MS);

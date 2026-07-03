@@ -10,8 +10,12 @@ import { computeFileLists } from "./file-operations.ts";
 import { parseBeforeCompactEvent } from "./event-guard.ts";
 import { buildValidatedCompaction } from "./result-guard.ts";
 import {
+	buildNoPriorHistorySummary,
 	buildSummaryRequest,
+	buildTurnPrefixSummaryRequest,
 	calculateSummaryMaxTokens,
+	calculateTurnPrefixMaxTokens,
+	formatSplitTurnSummary,
 } from "./summary-request.ts";
 import {
 	requestSummary,
@@ -42,6 +46,10 @@ type SummaryAttemptFailure =
 			reason: "invalid-structure" | "too-long" | "invalid-result";
 			message?: string;
 	  };
+
+type SummaryFragmentResult =
+	| { ok: true; summary: string; maxTokens: number }
+	| ({ ok: false } & SummaryAttemptFailure);
 
 type SummaryAttemptResult =
 	| { ok: true; compaction: NonNullable<CompactionResult>; mode: SummaryMode }
@@ -106,10 +114,23 @@ export async function handleBeforeCompact(
 	const currentFiles = computeFileLists(fileOps);
 	const mergedFiles = mergeFileLists(previousFiles, currentFiles);
 
-	const summarize = async (
+	const requestHistorySummary = async (
+		mode: SummaryMode,
 		forceMode?: SummaryMode,
-	): Promise<SummaryAttemptResult> => {
-		const { promptText, mode } = buildSummaryRequest({
+	): Promise<SummaryFragmentResult> => {
+		if (preparation.messagesToSummarize.length === 0) {
+			return {
+				ok: true,
+				summary: stripFileTags(previousSummary ?? buildNoPriorHistorySummary()),
+				maxTokens: calculateSummaryMaxTokens({
+					reserveTokens: settings.reserveTokens,
+					modelMaxTokens: model.maxTokens,
+					mode,
+				}),
+			};
+		}
+
+		const { promptText } = buildSummaryRequest({
 			preparation,
 			state,
 			customInstructions,
@@ -122,12 +143,6 @@ export async function handleBeforeCompact(
 			modelMaxTokens: model.maxTokens,
 			mode,
 		});
-
-		notify(
-			ctx,
-			`Autocompact v2: summarizing ${allMessages.length} messages with ${model.provider}/${model.id} (${mode}).`,
-			"info",
-		);
 		const summaryResult = await requestSummary({
 			model,
 			auth,
@@ -138,14 +153,75 @@ export async function handleBeforeCompact(
 		if (!summaryResult.ok) {
 			return {
 				ok: false,
-				mode,
 				reason: summaryResult.reason,
 				message: summaryResult.message,
 			};
 		}
+		return {
+			ok: true,
+			summary: stripFileTags(summaryResult.summary),
+			maxTokens,
+		};
+	};
 
-		let summary = stripFileTags(summaryResult.summary);
-		const structure = validateSummaryStructure(summary);
+	const requestTurnPrefixSummary = async (): Promise<SummaryFragmentResult> => {
+		if (preparation.turnPrefixMessages.length === 0) {
+			return { ok: true, summary: "", maxTokens: 0 };
+		}
+		const { promptText } = buildTurnPrefixSummaryRequest({ preparation });
+		const maxTokens = calculateTurnPrefixMaxTokens({
+			reserveTokens: settings.reserveTokens,
+			modelMaxTokens: model.maxTokens,
+		});
+		const summaryResult = await requestSummary({
+			model,
+			auth,
+			promptText,
+			maxTokens,
+			signal,
+		});
+		if (!summaryResult.ok) {
+			return {
+				ok: false,
+				reason: summaryResult.reason,
+				message: summaryResult.message,
+			};
+		}
+		return {
+			ok: true,
+			summary: stripFileTags(summaryResult.summary),
+			maxTokens,
+		};
+	};
+
+	const summarize = async (
+		forceMode?: SummaryMode,
+	): Promise<SummaryAttemptResult> => {
+		const { mode } = buildSummaryRequest({
+			preparation,
+			state,
+			customInstructions,
+			reason,
+			willRetry,
+			forceMode,
+		});
+		notify(
+			ctx,
+			`Autocompact v2: summarizing ${allMessages.length} messages with ${model.provider}/${model.id} (${mode}).`,
+			"info",
+		);
+
+		const historyResult = await requestHistorySummary(mode, forceMode);
+		if (!historyResult.ok) {
+			return {
+				ok: false,
+				mode,
+				reason: historyResult.reason,
+				message: historyResult.message,
+			};
+		}
+
+		const structure = validateSummaryStructure(historyResult.summary);
 		if (!structure.ok) {
 			return {
 				ok: false,
@@ -155,9 +231,30 @@ export async function handleBeforeCompact(
 			};
 		}
 
+		const turnPrefixResult = await requestTurnPrefixSummary();
+		if (!turnPrefixResult.ok) {
+			return {
+				ok: false,
+				mode,
+				reason: turnPrefixResult.reason,
+				message: turnPrefixResult.message,
+			};
+		}
+
+		let summary = turnPrefixResult.summary
+			? formatSplitTurnSummary({
+					historySummary: historyResult.summary,
+					turnPrefixSummary: turnPrefixResult.summary,
+				})
+			: historyResult.summary;
 		summary += formatFileOperations(
 			mergedFiles.readFiles,
 			mergedFiles.modifiedFiles,
+		);
+
+		const maxTokens = Math.max(
+			historyResult.maxTokens,
+			historyResult.maxTokens + turnPrefixResult.maxTokens,
 		);
 		const size = validateSummarySize({ summary, tokensBefore, maxTokens });
 		if (!size.ok) {
@@ -202,9 +299,7 @@ export async function handleBeforeCompact(
 	}
 }
 
-function fallbackMessageForSummaryFailure(
-	result: SummaryAttemptFailure,
-): string {
+function fallbackMessageForSummaryFailure(result: SummaryAttemptFailure): string {
 	switch (result.reason) {
 		case "empty":
 			return "Autocompact v2 produced an empty summary; using default compaction.";
