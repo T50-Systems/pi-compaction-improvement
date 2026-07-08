@@ -105,6 +105,18 @@ describe("buildSummarizationPrompt", () => {
 		expect(prompt).not.toContain("pi-thread-goal");
 	});
 
+	it("instructs summaries to condense noisy todos and command output", () => {
+		const prompt = buildSummarizationPrompt({
+			mode: "standard",
+			previousSummary: false,
+			hasSplitTurn: false,
+		});
+
+		expect(prompt).toContain("Do not copy long logs, full tool outputs");
+		expect(prompt).toContain("Do not reproduce full todo/task snapshots");
+		expect(prompt).toContain("Completed: 85/87 tasks summarized");
+	});
+
 	it("strips autocompact directives before showing custom focus", () => {
 		expect(
 			stripAutocompactDirectives(

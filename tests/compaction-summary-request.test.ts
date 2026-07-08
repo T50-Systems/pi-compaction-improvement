@@ -88,6 +88,38 @@ describe("summary request", () => {
 		expect(request.promptText).toContain("Use this exact structure");
 	});
 
+	it("condenses noisy todo snapshots before provider prompt budgeting", () => {
+		const state = createInitialState();
+		const noisyTodoSnapshot = [
+			"● Todos (8/10)",
+			"├─ ✓ #1 Bootstrap MVP project",
+			"├─ ✓ #2 Implement terminal core",
+			"├─ ✓ #3 Add tests",
+			"├─ ✓ #4 Wire renderer",
+			"├─ ✓ #5 Validate shaper",
+			"├─ ✓ #6 Update docs",
+			"├─ ✓ #7 Run checks",
+			"├─ ✓ #8 Review diff",
+			"├─ □ #9 Inspect compact output",
+			"└─ ⟳ #10 Patch noise filter",
+		].join("\n");
+		const request = buildSummaryRequest({
+			preparation: preparation({
+				messagesToSummarize: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: noisyTodoSnapshot }],
+					},
+				],
+			}),
+			state,
+		});
+
+		expect(request.promptText).toContain("condensed 10-row todo snapshot");
+		expect(request.promptText).toContain("Inspect compact output");
+		expect(request.promptText).not.toContain("Bootstrap MVP project");
+	});
+
 	it("derives prompt budget from model context minus output budget", () => {
 		expect(
 			calculatePromptMaxTokens({

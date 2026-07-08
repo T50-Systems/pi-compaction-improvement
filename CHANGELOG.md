@@ -6,6 +6,7 @@
 - Bounds oversized summary prompts against the model context window before provider calls
 - Exposes formal compaction lifecycle/invariant metadata for verification and telemetry
 - Extends deferred post-agent autocompaction to wait through long continuations before compacting
+- Condenses verbose todo snapshots, completed checklist runs, and count/path command-output listings before summary generation to avoid rehydrating noisy context
 
 ## v0.1.6
 

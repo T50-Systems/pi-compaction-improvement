@@ -9,6 +9,7 @@ import {
 	type SummaryMode,
 } from "../prompt.ts";
 import type { AutoCompactState } from "../state.ts";
+import { condenseSerializedConversationNoise } from "./summary-noise-filter.ts";
 import { estimateTokens } from "./summary-size-policy.ts";
 import type {
 	SafeCompactionPreparation,
@@ -45,7 +46,9 @@ export function resolveSummaryReason(state: AutoCompactState): SummaryReason {
 }
 
 function serializeMessages(messages: unknown[], maxTokens?: number): string {
-	const serialized = serializeConversation(convertToLlm(messages as never));
+	const serialized = condenseSerializedConversationNoise(
+		serializeConversation(convertToLlm(messages as never)),
+	);
 	return truncateEstimatedTokens(serialized, maxTokens);
 }
 
@@ -144,15 +147,18 @@ export function buildSummaryRequest(input: {
 			`trigger=${state.lastCompactionReason ?? "unknown"}`,
 		].join("\n"),
 	);
+	const previousSummary = preparation.previousSummary
+		? condenseSerializedConversationNoise(preparation.previousSummary)
+		: undefined;
 	const promptInstructions = buildSummarizationPrompt({
 		mode,
-		previousSummary: Boolean(preparation.previousSummary),
+		previousSummary: Boolean(previousSummary),
 		customInstructions: stripAutocompactDirectives(customInstructions),
 		hasSplitTurn: preparation.turnPrefixMessages.length > 0,
 	});
 	const fixedPromptText = [compactionContext, promptInstructions].join("\n\n");
 	const budgets = allocateVariablePromptBudgets({
-		previousSummary: preparation.previousSummary,
+		previousSummary,
 		fixedPromptText,
 		promptMaxTokens: input.promptMaxTokens,
 	});
@@ -160,11 +166,11 @@ export function buildSummaryRequest(input: {
 		"messages-to-summarize",
 		serializeMessages(preparation.messagesToSummarize, budgets.messagesMaxTokens),
 	);
-	const previousSummaryBlock = preparation.previousSummary
+	const previousSummaryBlock = previousSummary
 		? safeTaggedBlock(
 				"previous-summary",
 				truncateEstimatedTokens(
-					preparation.previousSummary,
+					previousSummary,
 					budgets.previousSummaryMaxTokens,
 				),
 			)
