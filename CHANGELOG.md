@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.7
+
+- Adds pre-prompt autocompaction to compact before accepting prompts that would exceed the threshold, then replays the prompt
+- Bounds oversized summary prompts against the model context window before provider calls
+- Exposes formal compaction lifecycle/invariant metadata for verification and telemetry
+- Extends deferred post-agent autocompaction to wait through long continuations before compacting
+
 ## v0.1.6
 
 - Moves proactive autocompact from `turn_end` to `agent_end` so it does not interrupt an active agent/tool loop

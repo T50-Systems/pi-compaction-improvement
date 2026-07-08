@@ -2,6 +2,7 @@ import { parseFileLists } from "../file-tags.ts";
 import { buildValidatedCompaction } from "./result-guard.ts";
 import { validateSummarySize } from "./summary-size-policy.ts";
 import { validateSummaryStructure } from "./summary-structure-guard.ts";
+import type { CompactionInvariant } from "./invariants.ts";
 import type { CompactionPlan } from "./compaction-plan.ts";
 import type { ValidatedExtensionCompaction } from "./types.ts";
 
@@ -12,10 +13,19 @@ export type CompactionVerificationIssue =
 	| "missing-turn-prefix-context"
 	| "invalid-result";
 
+export const COMPACTION_VERIFICATION_ISSUE_INVARIANTS = {
+	"invalid-structure": "required-summary-sections-preserved",
+	"too-long": "summary-size-bounded",
+	"missing-file-list": "file-lists-preserved",
+	"missing-turn-prefix-context": "split-turn-context-preserved",
+	"invalid-result": "validated-result-only",
+} as const satisfies Record<CompactionVerificationIssue, CompactionInvariant>;
+
 export interface CompactionVerificationResult {
 	ok: boolean;
 	issues: CompactionVerificationIssue[];
 	message?: string;
+	violatedInvariants: CompactionInvariant[];
 }
 
 export type VerifiedCompactionCommit =
@@ -73,6 +83,9 @@ export function verifyCompactionSummary(input: {
 	return {
 		ok: issues.length === 0,
 		issues,
+		violatedInvariants: Array.from(
+			new Set(issues.map((issue) => COMPACTION_VERIFICATION_ISSUE_INVARIANTS[issue])),
+		),
 		message: messages.join("; ") || undefined,
 	};
 }
@@ -98,6 +111,7 @@ export function commitVerifiedCompaction(input: {
 				ok: false,
 				issues: ["invalid-result"],
 				message: "validated compaction result could not be built",
+				violatedInvariants: ["validated-result-only"],
 			},
 		};
 	}

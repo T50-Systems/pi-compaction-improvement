@@ -33,6 +33,51 @@ export type CompactionLifecycleEventType =
 	| "skipped"
 	| "failed";
 
+export const COMPACTION_LIFECYCLE_STATES = [
+	"idle",
+	"observed",
+	"authenticated",
+	"planned",
+	"mode-resolved",
+	"history-producing",
+	"history-produced",
+	"history-validated",
+	"turn-prefix-producing",
+	"turn-prefix-produced",
+	"assembled",
+	"verifying",
+	"committed",
+	"completed",
+	"skipped",
+	"failed",
+] as const satisfies readonly CompactionLifecycleStatus[];
+
+export const COMPACTION_LIFECYCLE_ALPHABET = [
+	"event-observed",
+	"auth-resolved",
+	"plan-built",
+	"mode-resolved",
+	"history-requested",
+	"history-produced",
+	"history-validated",
+	"turn-prefix-requested",
+	"turn-prefix-produced",
+	"summary-assembled",
+	"verification-started",
+	"commit-accepted",
+	"completed",
+	"skipped",
+	"failed",
+] as const satisfies readonly CompactionLifecycleEventType[];
+
+export const COMPACTION_LIFECYCLE_INITIAL_STATE: CompactionLifecycleStatus = "idle";
+
+export const COMPACTION_LIFECYCLE_TERMINAL_STATES = [
+	"completed",
+	"skipped",
+	"failed",
+] as const satisfies readonly CompactionLifecycleStatus[];
+
 export interface CompactionLifecycleEvent {
 	type: CompactionLifecycleEventType;
 	reason?: string;
@@ -44,6 +89,15 @@ export interface CompactionLifecycleSnapshot {
 	history: Array<CompactionLifecycleEvent & { from: CompactionLifecycleStatus; to: CompactionLifecycleStatus }>;
 }
 
+/**
+ * Formal finite automaton for a compaction attempt:
+ * A = (Q, Σ, δ, q0, F) where:
+ * - Q = COMPACTION_LIFECYCLE_STATES
+ * - Σ = COMPACTION_LIFECYCLE_ALPHABET
+ * - δ = TRANSITIONS
+ * - q0 = COMPACTION_LIFECYCLE_INITIAL_STATE
+ * - F = COMPACTION_LIFECYCLE_TERMINAL_STATES
+ */
 const TRANSITIONS: Record<CompactionLifecycleStatus, Partial<Record<CompactionLifecycleEventType, CompactionLifecycleStatus>>> = {
 	idle: {
 		"event-observed": "observed",
@@ -106,7 +160,7 @@ const TRANSITIONS: Record<CompactionLifecycleStatus, Partial<Record<CompactionLi
 };
 
 export function createCompactionLifecycleSnapshot(): CompactionLifecycleSnapshot {
-	return { status: "idle", history: [] };
+	return { status: COMPACTION_LIFECYCLE_INITIAL_STATE, history: [] };
 }
 
 export function transitionCompactionLifecycle(

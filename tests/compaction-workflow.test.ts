@@ -96,6 +96,7 @@ describe("contract-driven compaction workflow", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.issues).toContain("missing-file-list");
+		expect(result.violatedInvariants).toContain("file-lists-preserved");
 	});
 
 	it("requires explicit turn-prefix context when the plan has split-turn input", () => {
@@ -119,5 +120,8 @@ describe("contract-driven compaction workflow", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.issues).toContain("missing-turn-prefix-context");
+		expect(result.violatedInvariants).toContain(
+			"split-turn-context-preserved",
+		);
 	});
 });

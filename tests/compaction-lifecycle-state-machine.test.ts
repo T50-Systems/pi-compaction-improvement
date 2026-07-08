@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	COMPACTION_LIFECYCLE_ALPHABET,
+	COMPACTION_LIFECYCLE_INITIAL_STATE,
+	COMPACTION_LIFECYCLE_STATES,
+	COMPACTION_LIFECYCLE_TERMINAL_STATES,
 	createCompactionLifecycleSnapshot,
 	failCompactionLifecycle,
 	skipCompactionLifecycle,
@@ -7,6 +11,20 @@ import {
 } from "../src/compaction/lifecycle-state-machine.ts";
 
 describe("compaction lifecycle state machine", () => {
+	it("declares the formal automaton components", () => {
+		expect(COMPACTION_LIFECYCLE_INITIAL_STATE).toBe("idle");
+		expect(COMPACTION_LIFECYCLE_STATES).toContain(
+			COMPACTION_LIFECYCLE_INITIAL_STATE,
+		);
+		expect(COMPACTION_LIFECYCLE_TERMINAL_STATES).toEqual([
+			"completed",
+			"skipped",
+			"failed",
+		]);
+		expect(COMPACTION_LIFECYCLE_ALPHABET).toContain("event-observed");
+		expect(COMPACTION_LIFECYCLE_ALPHABET).toContain("completed");
+	});
+
 	it("allows the happy-path lifecycle only in order", () => {
 		let lifecycle = createCompactionLifecycleSnapshot();
 		for (const type of [
@@ -72,5 +90,15 @@ describe("compaction lifecycle state machine", () => {
 		expect(skipped.history[0]).toMatchObject({ reason: "invalid-event" });
 		expect(failed.status).toBe("failed");
 		expect(failed.history.at(-1)).toMatchObject({ reason: "provider-error" });
+	});
+
+	it("keeps final states terminal", () => {
+		for (const status of COMPACTION_LIFECYCLE_TERMINAL_STATES) {
+			for (const type of COMPACTION_LIFECYCLE_ALPHABET) {
+				expect(() =>
+					transitionCompactionLifecycle({ status, history: [] }, { type }),
+				).toThrow("Invalid compaction lifecycle transition");
+			}
+		}
 	});
 });

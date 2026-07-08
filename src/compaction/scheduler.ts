@@ -13,8 +13,11 @@ export interface ScheduledAutocompact {
 }
 
 export const AUTOCOMPACT_INITIAL_DEFER_MS = 250;
-export const AUTOCOMPACT_DEFER_MS = 25;
-export const MAX_AUTOCOMPACT_DEFER_ATTEMPTS = 5;
+export const AUTOCOMPACT_DEFER_MS = 1_000;
+export const AUTOCOMPACT_MAX_IDLE_WAIT_MS = 10 * 60 * 1_000;
+export const MAX_AUTOCOMPACT_DEFER_ATTEMPTS = Math.ceil(
+	AUTOCOMPACT_MAX_IDLE_WAIT_MS / AUTOCOMPACT_DEFER_MS,
+);
 
 export function createScheduledAutocompact(): ScheduledAutocompact {
 	return {

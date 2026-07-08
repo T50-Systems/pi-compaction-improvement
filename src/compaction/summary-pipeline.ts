@@ -15,6 +15,7 @@ import {
 	buildNoPriorHistorySummary,
 	buildSummaryRequest,
 	buildTurnPrefixSummaryRequest,
+	calculatePromptMaxTokens,
 	calculateSummaryMaxTokens,
 	calculateTurnPrefixMaxTokens,
 	formatSplitTurnSummary,
@@ -144,6 +145,11 @@ const requestHistorySummary: CompactionFilter<SummaryPipelineContext> = async (
 		};
 	}
 
+	const maxTokens = calculateSummaryMaxTokens({
+		reserveTokens: producing.preparation.settings.reserveTokens,
+		modelMaxTokens: producing.model.maxTokens,
+		mode,
+	});
 	const { promptText } = buildSummaryRequest({
 		preparation: producing.preparation,
 		state: producing.state,
@@ -151,11 +157,10 @@ const requestHistorySummary: CompactionFilter<SummaryPipelineContext> = async (
 		reason: producing.reason,
 		willRetry: producing.willRetry,
 		forceMode: producing.forceMode,
-	});
-	const maxTokens = calculateSummaryMaxTokens({
-		reserveTokens: producing.preparation.settings.reserveTokens,
-		modelMaxTokens: producing.model.maxTokens,
-		mode,
+		promptMaxTokens: calculatePromptMaxTokens({
+			modelContextWindow: getModelContextWindow(producing.model),
+			outputMaxTokens: maxTokens,
+		}),
 	});
 	const summaryResult = await requestSummary({
 		model: producing.model,
@@ -202,12 +207,16 @@ const requestTurnPrefixSummary: CompactionFilter<SummaryPipelineContext> = async
 		};
 	}
 
-	const { promptText } = buildTurnPrefixSummaryRequest({
-		preparation: producing.preparation,
-	});
 	const maxTokens = calculateTurnPrefixMaxTokens({
 		reserveTokens: producing.preparation.settings.reserveTokens,
 		modelMaxTokens: producing.model.maxTokens,
+	});
+	const { promptText } = buildTurnPrefixSummaryRequest({
+		preparation: producing.preparation,
+		promptMaxTokens: calculatePromptMaxTokens({
+			modelContextWindow: getModelContextWindow(producing.model),
+			outputMaxTokens: maxTokens,
+		}),
 	});
 	const summaryResult = await requestSummary({
 		model: producing.model,
@@ -306,6 +315,13 @@ function fail(
 			message,
 		} as SummaryAttemptResult,
 	};
+}
+
+function getModelContextWindow(model: SummaryProviderInput["model"]): number | undefined {
+	const contextWindow = (model as { contextWindow?: unknown }).contextWindow;
+	return typeof contextWindow === "number" && Number.isFinite(contextWindow)
+		? contextWindow
+		: undefined;
 }
 
 function requireMode(context: SummaryPipelineContext): SummaryMode {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../extensions/index.ts";
+import { AUTOCOMPACT_DEFER_MS } from "../src/compaction/scheduler.ts";
 
 type ExtensionHandler = (event: unknown, ctx: unknown) => Promise<void>;
 
@@ -71,6 +72,7 @@ describe("extension registration", () => {
 
 		extension({ on, registerCommand } as never);
 
+		expect(on).toHaveBeenCalledWith("input", expect.any(Function));
 		expect(on).toHaveBeenCalledWith("agent_end", expect.any(Function));
 		expect(on).toHaveBeenCalledWith(
 			"session_before_compact",
@@ -92,6 +94,45 @@ describe("extension registration", () => {
 	});
 });
 
+describe("input autocompact guard", () => {
+	it("compacts before replaying a prompt projected over the context threshold", async () => {
+		const handlers = new Map<string, ExtensionHandler>();
+		const sendUserMessage = vi.fn();
+		const on = vi.fn((event: string, handler: ExtensionHandler) => {
+			handlers.set(event, handler);
+		});
+		extension({ on, registerCommand: vi.fn(), sendUserMessage } as never);
+		const compact = vi.fn((options?: { onComplete?: () => void }) => {
+			options?.onComplete?.();
+		});
+		const ctx = makeContext(await writeTriggerConfig(), compact);
+
+		const result = await handlers.get("input")?.(
+			{ text: "continue", source: "interactive" },
+			ctx,
+		);
+
+		expect(result).toEqual({ action: "handled" });
+		expect(compact).toHaveBeenCalledWith(
+			expect.objectContaining({ customInstructions: expect.any(String) }),
+		);
+		expect(sendUserMessage).toHaveBeenCalledWith("continue");
+	});
+
+	it("does not compact extension-replayed input again", async () => {
+		const handlers = registerExtension();
+		const ctx = makeContext(await writeTriggerConfig());
+
+		const result = await handlers.get("input")?.(
+			{ text: "continue", source: "extension" },
+			ctx,
+		);
+
+		expect(result).toEqual({ action: "continue" });
+		expect(ctx.compact).not.toHaveBeenCalled();
+	});
+});
+
 describe("agent_end autocompact scheduling", () => {
 	it("waits for the session to become idle with no pending messages before compacting", async () => {
 		vi.useFakeTimers();
@@ -108,7 +149,7 @@ describe("agent_end autocompact scheduling", () => {
 
 		ctx.isIdle.mockReturnValue(true);
 		ctx.hasPendingMessages.mockReturnValue(false);
-		await vi.advanceTimersByTimeAsync(25);
+		await vi.advanceTimersByTimeAsync(AUTOCOMPACT_DEFER_MS);
 
 		expect(ctx.compact).toHaveBeenCalledWith(
 			expect.objectContaining({ customInstructions: expect.any(String) }),

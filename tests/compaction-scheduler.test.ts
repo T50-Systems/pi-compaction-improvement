@@ -9,6 +9,7 @@ import {
 	createScheduledAutocompact,
 	scheduleAutocompact,
 	AUTOCOMPACT_INITIAL_DEFER_MS,
+	AUTOCOMPACT_DEFER_MS,
 } from "../src/compaction/scheduler.ts";
 
 type MockSchedulerContext = ReturnType<typeof baseContext>;
@@ -126,9 +127,34 @@ describe("compaction scheduler", () => {
 
 		expect(ctx.compact).not.toHaveBeenCalled();
 		ctx.signal = undefined;
-		vi.advanceTimersByTime(25);
+		vi.advanceTimersByTime(AUTOCOMPACT_DEFER_MS);
 
 		expect(ctx.compact).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps waiting through a long post-agent continuation before compacting", () => {
+		vi.useFakeTimers();
+		const state = createInitialState();
+		noteCompactionRequested(state, 1, "rapid-growth");
+		const schedule = createScheduledAutocompact();
+		let idle = false;
+		const ctx = makeContext({ isIdle: vi.fn(() => idle) });
+
+		scheduleAutocompact(ctx as never, state, schedule, {
+			turnIndex: 1,
+			reason: "rapid-growth",
+		});
+		vi.advanceTimersByTime(AUTOCOMPACT_INITIAL_DEFER_MS);
+		vi.advanceTimersByTime(5 * 60 * 1_000 + 30 * 1_000);
+
+		expect(ctx.compact).not.toHaveBeenCalled();
+		expect(state.compactionPhase).toBe("scheduled");
+
+		idle = true;
+		vi.advanceTimersByTime(AUTOCOMPACT_DEFER_MS);
+
+		expect(ctx.compact).toHaveBeenCalledTimes(1);
+		expect(state.compactionPhase).toBe("triggering");
 	});
 
 	it("skips safely if the trigger still sees an active abort signal", () => {

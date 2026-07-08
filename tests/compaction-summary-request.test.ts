@@ -3,6 +3,7 @@ import { createInitialState } from "../src/state.ts";
 import {
 	buildSummaryRequest,
 	buildTurnPrefixSummaryRequest,
+	calculatePromptMaxTokens,
 	calculateSummaryMaxTokens,
 	calculateTurnPrefixMaxTokens,
 	formatSplitTurnSummary,
@@ -66,6 +67,36 @@ describe("summary request", () => {
 		).toBe(500);
 	});
 
+	it("budgets oversized summary prompts before provider calls", () => {
+		const state = createInitialState();
+		const request = buildSummaryRequest({
+			preparation: preparation({
+				messagesToSummarize: [
+					{
+						role: "user",
+						content: [{ type: "text", text: "large ".repeat(20_000) }],
+					},
+				],
+				previousSummary: "previous ".repeat(10_000),
+			}),
+			state,
+			promptMaxTokens: 1_000,
+		});
+
+		expect(request.promptText).toContain("omitted approximately");
+		expect(request.promptText.length).toBeLessThanOrEqual(4_200);
+		expect(request.promptText).toContain("Use this exact structure");
+	});
+
+	it("derives prompt budget from model context minus output budget", () => {
+		expect(
+			calculatePromptMaxTokens({
+				modelContextWindow: 8_000,
+				outputMaxTokens: 1_000,
+			}),
+		).toBe(5_976);
+	});
+
 	it("uses aggressive mode and lower output budget for retry compaction", () => {
 		const state = createInitialState();
 		const request = buildSummaryRequest({
@@ -104,6 +135,24 @@ describe("summary request", () => {
 				modelMaxTokens: 10_000,
 			}),
 		).toBe(500);
+	});
+
+	it("budgets oversized split-turn prefix prompts", () => {
+		const request = buildTurnPrefixSummaryRequest({
+			preparation: preparation({
+				turnPrefixMessages: [
+					{
+						role: "user",
+						content: [{ type: "text", text: "prefix ".repeat(20_000) }],
+					},
+				],
+			}),
+			promptMaxTokens: 900,
+		});
+
+		expect(request.promptText).toContain("omitted approximately");
+		expect(request.promptText.length).toBeLessThanOrEqual(3_800);
+		expect(request.promptText).toContain("PREFIX of a turn");
 	});
 
 	it("formats split-turn summaries with the original turn context marker", () => {

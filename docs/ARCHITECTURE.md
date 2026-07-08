@@ -121,6 +121,18 @@ skipped
 failed
 ```
 
+Formal definition:
+
+```text
+A = (Q, Σ, δ, q0, F)
+
+Q  = COMPACTION_LIFECYCLE_STATES
+Σ  = COMPACTION_LIFECYCLE_ALPHABET
+δ  = TRANSITIONS
+q0 = COMPACTION_LIFECYCLE_INITIAL_STATE = idle
+F  = COMPACTION_LIFECYCLE_TERMINAL_STATES = {completed, skipped, failed}
+```
+
 The state machine is intentionally lightweight. It answers:
 
 - Did this compaction attempt move through valid phases?
@@ -139,6 +151,24 @@ Those are contract/workflow responsibilities.
 ### Lifecycle callbacks
 
 `runSummaryAttemptPipeline()` accepts `onLifecycle`, which receives snapshots as phases advance. This gives tests and future telemetry a stable hook without coupling production code to logging.
+
+## Formal invariants
+
+`src/compaction/invariants.ts` defines the invariant set:
+
+```text
+I = {
+  valid-lifecycle-transition,
+  terminal-states-are-absorbing,
+  required-summary-sections-preserved,
+  summary-size-bounded,
+  file-lists-preserved,
+  split-turn-context-preserved,
+  validated-result-only
+}
+```
+
+Lifecycle invariants are enforced by `transitionCompactionLifecycle()` and the terminal-state tests. Semantic invariants are enforced by `verifyCompactionSummary()` and exposed through `violatedInvariants` so fallback paths can report which contract failed. Verification issues map to invariants through `COMPACTION_VERIFICATION_ISSUE_INVARIANTS`.
 
 ## Contract-driven verification
 
@@ -203,6 +233,7 @@ Key tests:
 - `tests/compaction-pipeline.test.ts`: generic pipe-and-filter ordering.
 - `tests/compaction-summary-pipeline.test.ts`: summary pipeline assembly, commit, notifications, and lifecycle progress.
 - `tests/compaction-lifecycle-state-machine.test.ts`: valid/invalid lifecycle transitions and terminal states.
+- `tests/compaction-invariants.test.ts`: formal invariant catalog and issue-to-invariant mapping.
 - `tests/compaction-workflow.test.ts`: contract-driven verification and commit behavior.
 - `tests/extension-before-compact.test.ts`: integration through the extension hook.
 
