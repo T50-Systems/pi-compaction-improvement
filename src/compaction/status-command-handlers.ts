@@ -1,3 +1,4 @@
+import { clearLifecycleDiagnostics } from "./lifecycle-diagnostics.ts";
 import type { AutoCompactState } from "../state.ts";
 import { formatStatusLine, formatStatusReport } from "../state-formatting.ts";
 import type { CommandContextPort } from "./ports.ts";
@@ -14,8 +15,9 @@ export async function handleStatusCommand(
 	state: AutoCompactState,
 ): Promise<void> {
 	if (args.trim() === "clear") {
+		clearLifecycleDiagnostics(state.lifecycleDiagnostics);
 		setStatusReportWidget(ctx);
-		notify(ctx, "Autocompact v2 status widget cleared.", "info");
+		notify(ctx, "Autocompact v2 lifecycle diagnostics and status widget cleared.", "info");
 		return;
 	}
 	await showStatus(ctx, state);

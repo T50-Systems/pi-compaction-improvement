@@ -1,3 +1,4 @@
+import type { CompactionLifecycleDiagnostic } from "./compaction/lifecycle-diagnostics.ts";
 import type { AutoCompactConfig, ConfigLoadResult } from "./config.ts";
 import type { AutoCompactDecisionReason, PolicyEvaluation } from "./policy.ts";
 
@@ -22,6 +23,7 @@ export interface AutoCompactState {
 	lastCompactionReason: string | null;
 	lastCompactionSource: "extension" | "core" | null;
 	compactionCount: number;
+	lifecycleDiagnostics: CompactionLifecycleDiagnostic[];
 }
 
 export interface StatusSnapshot {
@@ -46,6 +48,7 @@ export function createInitialState(): AutoCompactState {
 		lastCompactionReason: null,
 		lastCompactionSource: null,
 		compactionCount: 0,
+		lifecycleDiagnostics: [],
 	};
 }
 

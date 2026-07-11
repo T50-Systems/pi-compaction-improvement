@@ -34,6 +34,8 @@ Make Pi compaction proactive, context-preserving, observable, and safe without r
 /autocompact-config global <key> <value>
 ```
 
+`/autocompact-status` includes the newest-first, bounded lifecycle diagnostic history. `/autocompact-status clear` removes both that history and the status widget. Diagnostics include only trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category—never prompts, summaries, file contents, headers, tokens, or credentials.
+
 ## Architecture
 
 The compaction path is split into small, testable layers:
@@ -127,7 +129,7 @@ Inspect the summary for goal/progress, constraints, files, blockers, and the imm
 ```bash
 npm install
 npm run typecheck
-npm test
+npm run test:coverage
 npm run check:file-size
 git diff --check
 pi install .
@@ -147,6 +149,7 @@ This repository is an installable Pi extension package. It does not provide dura
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product vision and success metrics.
 - [`reports/roadmap.md`](reports/roadmap.md) — follow-up roadmap.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow.
+- [`SECURITY.md`](SECURITY.md) — private reporting and compaction trust boundaries.
 - [`CHANGELOG.md`](CHANGELOG.md) — release history.
 
 ## License

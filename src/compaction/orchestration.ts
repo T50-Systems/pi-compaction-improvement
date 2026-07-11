@@ -3,6 +3,10 @@ import { mergeFileLists, parseFileLists } from "../file-tags.ts";
 import { buildCompactionPlan } from "./compaction-plan.ts";
 import { parseBeforeCompactEvent } from "./event-guard.ts";
 import { computeFileLists } from "./file-operations.ts";
+import {
+	appendLifecycleDiagnostic,
+	type LifecycleFallbackCategory,
+} from "./lifecycle-diagnostics.ts";
 import type { NotifyContextPort } from "./ports.ts";
 import {
 	runSummaryAttemptPipeline,
@@ -30,8 +34,15 @@ export async function handleBeforeCompact(
 	ctx: SummaryContextPort,
 	state: AutoCompactState,
 ): Promise<CompactionResult | undefined> {
+	const startedAt = Date.now();
 	const safeEvent = parseBeforeCompactEvent(event);
 	if (!safeEvent) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: "incompatible-event",
+			terminalState: "skipped",
+			startedAt,
+			fallbackCategory: "incompatible-event",
+		});
 		notify(
 			ctx,
 			"Autocompact v2: received an incompatible compaction event; using default compaction.",
@@ -40,8 +51,15 @@ export async function handleBeforeCompact(
 		return;
 	}
 
+	const { preparation, signal, customInstructions, reason, willRetry } = safeEvent;
 	const model = ctx.model;
 	if (!model) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "skipped",
+			startedAt,
+			fallbackCategory: "missing-model",
+		});
 		notify(
 			ctx,
 			"Autocompact v2: no active model; falling back to default compaction.",
@@ -50,8 +68,30 @@ export async function handleBeforeCompact(
 		return;
 	}
 
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	let auth: Awaited<ReturnType<SummaryContextPort["modelRegistry"]["getApiKeyAndHeaders"]>>;
+	try {
+		auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	} catch (error) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "failed",
+			startedAt,
+			fallbackCategory: "unexpected-error",
+		});
+		notify(
+			ctx,
+			`Autocompact v2 failed to resolve auth; using default compaction: ${error instanceof Error ? error.message : String(error)}`,
+			"error",
+		);
+		return;
+	}
 	if (!auth.ok || !auth.apiKey) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "skipped",
+			startedAt,
+			fallbackCategory: "missing-auth",
+		});
 		notify(
 			ctx,
 			`Autocompact v2: could not resolve auth for ${model.provider}/${model.id}; using default compaction.`,
@@ -60,13 +100,19 @@ export async function handleBeforeCompact(
 		return;
 	}
 
-	const { preparation, signal, customInstructions, reason, willRetry } =
-		safeEvent;
 	const allMessages = [
 		...preparation.messagesToSummarize,
 		...preparation.turnPrefixMessages,
 	];
-	if (allMessages.length === 0) return;
+	if (allMessages.length === 0) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "skipped",
+			startedAt,
+			fallbackCategory: "empty-input",
+		});
+		return;
+	}
 
 	const previousFiles = parseFileLists(preparation.previousSummary);
 	const currentFiles = computeFileLists(preparation.fileOps);
@@ -94,7 +140,8 @@ export async function handleBeforeCompact(
 			signal,
 			onNotify: (message) => notify(ctx, message, "info"),
 		});
-		const finalAttempt = shouldRetrySummaryFailure(firstAttempt)
+		const retried = shouldRetrySummaryFailure(firstAttempt);
+		const finalAttempt = retried
 			? await runSummaryAttemptPipeline({
 					preparation,
 					state,
@@ -110,15 +157,55 @@ export async function handleBeforeCompact(
 					onNotify: (message) => notify(ctx, message, "info"),
 				})
 			: firstAttempt;
-		if (finalAttempt.ok) return finalAttempt.compaction;
+		if (finalAttempt.ok) {
+			appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+				triggerReason: reason,
+				terminalState: "completed",
+				startedAt,
+				retryCount: retried ? 1 : 0,
+			});
+			return finalAttempt.compaction;
+		}
 
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "fallback",
+			startedAt,
+			retryCount: retried ? 1 : 0,
+			fallbackCategory: fallbackCategoryFor(finalAttempt),
+			violatedInvariants: finalAttempt.violatedInvariants,
+		});
 		notifySummaryFailure(ctx, finalAttempt);
 		return;
 	} catch (error) {
+		const aborted = signal?.aborted === true;
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: aborted ? "fallback" : "failed",
+			startedAt,
+			fallbackCategory: aborted ? "aborted" : "unexpected-error",
+		});
 		const message = error instanceof Error ? error.message : String(error);
-		if (signal?.aborted !== true)
-			notify(ctx, `Autocompact v2 failed: ${message}`, "error");
+		if (!aborted) notify(ctx, `Autocompact v2 failed: ${message}`, "error");
 		return;
+	}
+}
+
+function fallbackCategoryFor(
+	result: SummaryAttemptFailure,
+): LifecycleFallbackCategory {
+	switch (result.reason) {
+		case "empty":
+			return "empty-summary";
+		case "invalid-structure":
+		case "too-long":
+			return "invalid-summary";
+		case "invalid-result":
+			return "invalid-result";
+		case "verification-failed":
+			return "verification-failed";
+		default:
+			return result.reason;
 	}
 }
 

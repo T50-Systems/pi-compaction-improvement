@@ -1,6 +1,7 @@
 import type { SummaryMode } from "../prompt.ts";
 import { formatFileOperations, stripFileTags } from "../file-tags.ts";
 import type { AutoCompactState } from "../state.ts";
+import type { CompactionInvariant } from "./invariants.ts";
 import type { CompactionPlan } from "./compaction-plan.ts";
 import { commitVerifiedCompaction } from "./compaction-workflow.ts";
 import {
@@ -20,7 +21,11 @@ import {
 	calculateTurnPrefixMaxTokens,
 	formatSplitTurnSummary,
 } from "./summary-request.ts";
-import { requestSummary, type SummaryProviderInput } from "./summary-provider.ts";
+import {
+	requestSummary as requestProviderSummary,
+	type SummaryProviderInput,
+	type SummaryProviderResult,
+} from "./summary-provider.ts";
 import { validateSummaryStructure } from "./summary-structure-guard.ts";
 import type {
 	FileListDetails,
@@ -29,15 +34,20 @@ import type {
 	ValidatedExtensionCompaction,
 } from "./types.ts";
 
-export type SummaryAttemptFailure =
+export type SummaryAttemptFailure = (
 	| {
 			reason: "empty" | "provider-error" | "timeout" | "aborted";
 			message?: string;
 	  }
 	| {
-			reason: "invalid-structure" | "too-long" | "invalid-result" | "verification-failed";
+			reason:
+				| "invalid-structure"
+				| "too-long"
+				| "invalid-result"
+				| "verification-failed";
 			message?: string;
-	  };
+	  }
+) & { violatedInvariants?: readonly CompactionInvariant[] };
 
 export type SummaryFragmentResult =
 	| { ok: true; summary: string; maxTokens: number }
@@ -58,6 +68,7 @@ export interface SummaryPipelineInput {
 	model: SummaryProviderInput["model"];
 	auth: SummaryProviderInput["auth"];
 	signal?: AbortSignal;
+	summaryProvider?: (input: SummaryProviderInput) => Promise<SummaryProviderResult>;
 	forceMode?: SummaryMode;
 	lifecycle?: CompactionLifecycleSnapshot;
 	onLifecycle?: (snapshot: CompactionLifecycleSnapshot) => void;
@@ -162,7 +173,7 @@ const requestHistorySummary: CompactionFilter<SummaryPipelineContext> = async (
 			outputMaxTokens: maxTokens,
 		}),
 	});
-	const summaryResult = await requestSummary({
+	const summaryResult = await (producing.summaryProvider ?? requestProviderSummary)({
 		model: producing.model,
 		auth: producing.auth,
 		promptText,
@@ -190,7 +201,12 @@ const validateHistorySummary: CompactionFilter<SummaryPipelineContext> = (
 	if (!history.ok) return fail(context, history.reason, history.message);
 	const structure = validateSummaryStructure(history.summary);
 	if (!structure.ok) {
-		return fail(context, "invalid-structure", structure.issues.join(", "));
+		return fail(
+			context,
+			"invalid-structure",
+			structure.issues.join(", "),
+			["required-summary-sections-preserved"],
+		);
 	}
 	return advanceLifecycle(context, "history-validated");
 };
@@ -218,7 +234,7 @@ const requestTurnPrefixSummary: CompactionFilter<SummaryPipelineContext> = async
 			outputMaxTokens: maxTokens,
 		}),
 	});
-	const summaryResult = await requestSummary({
+	const summaryResult = await (producing.summaryProvider ?? requestProviderSummary)({
 		model: producing.model,
 		auth: producing.auth,
 		promptText,
@@ -286,7 +302,12 @@ const verifyAndCommitSummary: CompactionFilter<SummaryPipelineContext> = (
 			: commit.verification.issues.includes("too-long")
 				? "too-long"
 				: "verification-failed";
-		return fail(verifying, reason, commit.verification.message);
+		return fail(
+			verifying,
+			reason,
+			commit.verification.message,
+			commit.verification.violatedInvariants,
+		);
 	}
 	const completed = advanceLifecycle(
 		advanceLifecycle(verifying, "commit-accepted"),
@@ -302,6 +323,7 @@ function fail(
 	context: SummaryPipelineContext,
 	reason: SummaryAttemptFailure["reason"],
 	message?: string,
+	violatedInvariants?: readonly CompactionInvariant[],
 ): SummaryPipelineContext {
 	const failedLifecycle = failCompactionLifecycle(context.lifecycle, message ?? reason);
 	const failedContext = { ...context, lifecycle: failedLifecycle };
@@ -313,6 +335,7 @@ function fail(
 			mode: context.mode ?? "standard",
 			reason,
 			message,
+			violatedInvariants,
 		} as SummaryAttemptResult,
 	};
 }
