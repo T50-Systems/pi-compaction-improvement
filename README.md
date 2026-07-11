@@ -149,6 +149,7 @@ This repository is an installable Pi extension package. It does not provide dura
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product vision and success metrics.
 - [`reports/roadmap.md`](reports/roadmap.md) — follow-up roadmap.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow.
+- [`SECURITY.md`](SECURITY.md) — private reporting and compaction trust boundaries.
 - [`CHANGELOG.md`](CHANGELOG.md) — release history.
 
 ## License
