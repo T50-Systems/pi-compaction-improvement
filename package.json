@@ -33,7 +33,8 @@
     "docs",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "SECURITY.md"
   ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
