@@ -21,7 +21,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check:file-size": "node scripts/check-file-size.mjs"
+    "check:file-size": "node scripts/check-file-size.mjs",
+    "test:coverage": "vitest run --coverage",
+    "benchmark": "vitest bench --run"
   },
   "files": [
     "extensions",
@@ -40,6 +42,7 @@
     "@earendil-works/pi-ai": "^0.80.2",
     "@earendil-works/pi-coding-agent": "^0.80.2",
     "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
   },
