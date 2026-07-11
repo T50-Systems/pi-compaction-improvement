@@ -21,7 +21,11 @@ import {
 	calculateTurnPrefixMaxTokens,
 	formatSplitTurnSummary,
 } from "./summary-request.ts";
-import { requestSummary, type SummaryProviderInput } from "./summary-provider.ts";
+import {
+	requestSummary as requestProviderSummary,
+	type SummaryProviderInput,
+	type SummaryProviderResult,
+} from "./summary-provider.ts";
 import { validateSummaryStructure } from "./summary-structure-guard.ts";
 import type {
 	FileListDetails,
@@ -64,6 +68,7 @@ export interface SummaryPipelineInput {
 	model: SummaryProviderInput["model"];
 	auth: SummaryProviderInput["auth"];
 	signal?: AbortSignal;
+	summaryProvider?: (input: SummaryProviderInput) => Promise<SummaryProviderResult>;
 	forceMode?: SummaryMode;
 	lifecycle?: CompactionLifecycleSnapshot;
 	onLifecycle?: (snapshot: CompactionLifecycleSnapshot) => void;
@@ -168,7 +173,7 @@ const requestHistorySummary: CompactionFilter<SummaryPipelineContext> = async (
 			outputMaxTokens: maxTokens,
 		}),
 	});
-	const summaryResult = await requestSummary({
+	const summaryResult = await (producing.summaryProvider ?? requestProviderSummary)({
 		model: producing.model,
 		auth: producing.auth,
 		promptText,
@@ -229,7 +234,7 @@ const requestTurnPrefixSummary: CompactionFilter<SummaryPipelineContext> = async
 			outputMaxTokens: maxTokens,
 		}),
 	});
-	const summaryResult = await requestSummary({
+	const summaryResult = await (producing.summaryProvider ?? requestProviderSummary)({
 		model: producing.model,
 		auth: producing.auth,
 		promptText,
