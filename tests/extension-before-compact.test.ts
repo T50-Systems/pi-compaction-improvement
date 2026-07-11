@@ -336,6 +336,65 @@ describe("session_before_compact summarization", () => {
 		);
 	});
 
+	it("filters noisy todo and command output before the provider sees the prompt", async () => {
+		const handlers = registerExtension();
+		const ctx = makeContext(await writeTriggerConfig());
+		vi.mocked(complete).mockResolvedValueOnce({
+			content: [{ type: "text", text: structuredSummary("filtered summary") }],
+		} as never);
+		const noisyHistory = [
+			...Array.from(
+				{ length: 50 },
+				(_, index) => `${100 - index} internal/example/file-${index}.go`,
+			),
+			"",
+			"● Todos (85/87)",
+			...Array.from(
+				{ length: 85 },
+				(_, index) => `├─ ✓ #${index + 1} Completed task ${index + 1}`,
+			),
+			"├─ □ #86 Inspect Shaper state",
+			"└─ ⟳ #87 Update goal progress after get_goal",
+			"",
+			"Model stopped because it reached the maximum output token limit.",
+		].join("\n");
+
+		const result = await handlers.get("session_before_compact")?.(
+			makeBeforeCompactEvent({
+				preparation: {
+					messagesToSummarize: [
+						{
+							role: "assistant",
+							content: [{ type: "text", text: noisyHistory }],
+						},
+					],
+					tokensBefore: 120_000,
+				},
+			}),
+			ctx,
+		);
+
+		expect(result).toEqual({
+			compaction: expect.objectContaining({
+				summary: expect.stringContaining("filtered summary"),
+			}),
+		});
+		const promptText = (vi.mocked(complete).mock.calls[0]?.[1] as {
+			messages?: Array<{ content?: Array<{ text?: string }> }>;
+		}).messages?.[0]?.content?.[0]?.text;
+		expect(promptText).toContain("condensed 87-row todo snapshot");
+		expect(promptText).toContain("omitted 85 completed rows");
+		expect(promptText).toContain("Inspect Shaper state");
+		expect(promptText).toContain("Update goal progress after get_goal");
+		expect(promptText).toContain("omitted 42 count/path output lines");
+		expect(promptText).toContain(
+			"Model stopped because it reached the maximum output token limit.",
+		);
+		expect(promptText).not.toContain("Completed task 1");
+		expect(promptText).not.toContain("Completed task 85");
+		expect(promptText).not.toContain("internal/example/file-20.go");
+	});
+
 	it("times out a hanging summary request and falls back to default compaction", async () => {
 		vi.useFakeTimers();
 		const handlers = registerExtension();
