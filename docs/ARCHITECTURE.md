@@ -152,6 +152,8 @@ Those are contract/workflow responsibilities.
 
 `runSummaryAttemptPipeline()` accepts `onLifecycle`, which receives snapshots as phases advance. This gives tests and future telemetry a stable hook without coupling production code to logging.
 
+Production orchestration uses that hook and the attempt result to retain at most 20 privacy-safe lifecycle outcomes in extension memory. Each entry contains a timestamp, trigger category, terminal state (`skipped`, `failed`, `fallback`, or `completed`), duration, retry count, invariant identifiers, and a closed fallback category. The schema intentionally has no free-text payload fields, so it cannot retain prompts, generated summaries, API keys, request headers, transcript content, or file contents. `/autocompact-status clear` empties the history deterministically. The history is session-local and is discarded when the extension process ends.
+
 ## Formal invariants
 
 `src/compaction/invariants.ts` defines the invariant set:
@@ -252,7 +254,7 @@ When changing compaction behavior:
 
 ```bash
 npm run typecheck
-npm test
+npm run test:coverage
 npm run check:file-size
 git diff --check
 pi install .

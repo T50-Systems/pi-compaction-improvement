@@ -1,6 +1,7 @@
 import type { SummaryMode } from "../prompt.ts";
 import { formatFileOperations, stripFileTags } from "../file-tags.ts";
 import type { AutoCompactState } from "../state.ts";
+import type { CompactionInvariant } from "./invariants.ts";
 import type { CompactionPlan } from "./compaction-plan.ts";
 import { commitVerifiedCompaction } from "./compaction-workflow.ts";
 import {
@@ -29,15 +30,20 @@ import type {
 	ValidatedExtensionCompaction,
 } from "./types.ts";
 
-export type SummaryAttemptFailure =
+export type SummaryAttemptFailure = (
 	| {
 			reason: "empty" | "provider-error" | "timeout" | "aborted";
 			message?: string;
 	  }
 	| {
-			reason: "invalid-structure" | "too-long" | "invalid-result" | "verification-failed";
+			reason:
+				| "invalid-structure"
+				| "too-long"
+				| "invalid-result"
+				| "verification-failed";
 			message?: string;
-	  };
+	  }
+) & { violatedInvariants?: readonly CompactionInvariant[] };
 
 export type SummaryFragmentResult =
 	| { ok: true; summary: string; maxTokens: number }
@@ -190,7 +196,12 @@ const validateHistorySummary: CompactionFilter<SummaryPipelineContext> = (
 	if (!history.ok) return fail(context, history.reason, history.message);
 	const structure = validateSummaryStructure(history.summary);
 	if (!structure.ok) {
-		return fail(context, "invalid-structure", structure.issues.join(", "));
+		return fail(
+			context,
+			"invalid-structure",
+			structure.issues.join(", "),
+			["required-summary-sections-preserved"],
+		);
 	}
 	return advanceLifecycle(context, "history-validated");
 };
@@ -286,7 +297,12 @@ const verifyAndCommitSummary: CompactionFilter<SummaryPipelineContext> = (
 			: commit.verification.issues.includes("too-long")
 				? "too-long"
 				: "verification-failed";
-		return fail(verifying, reason, commit.verification.message);
+		return fail(
+			verifying,
+			reason,
+			commit.verification.message,
+			commit.verification.violatedInvariants,
+		);
 	}
 	const completed = advanceLifecycle(
 		advanceLifecycle(verifying, "commit-accepted"),
@@ -302,6 +318,7 @@ function fail(
 	context: SummaryPipelineContext,
 	reason: SummaryAttemptFailure["reason"],
 	message?: string,
+	violatedInvariants?: readonly CompactionInvariant[],
 ): SummaryPipelineContext {
 	const failedLifecycle = failCompactionLifecycle(context.lifecycle, message ?? reason);
 	const failedContext = { ...context, lifecycle: failedLifecycle };
@@ -313,6 +330,7 @@ function fail(
 			mode: context.mode ?? "standard",
 			reason,
 			message,
+			violatedInvariants,
 		} as SummaryAttemptResult,
 	};
 }

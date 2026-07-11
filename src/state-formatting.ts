@@ -1,3 +1,4 @@
+import type { CompactionLifecycleDiagnostic } from "./compaction/lifecycle-diagnostics.ts";
 import type { StatusSnapshot } from "./state.ts";
 
 function formatTokens(value: number | null): string {
@@ -41,5 +42,22 @@ export function formatStatusReport(snapshot: StatusSnapshot): string {
 		snapshot.configInfo.warnings.length > 0
 			? `warnings: ${snapshot.configInfo.warnings.join(" | ")}`
 			: "warnings: none",
+		"lifecycle diagnostics (newest first; /autocompact-status clear removes all):",
+		...formatLifecycleDiagnostics(snapshot.state.lifecycleDiagnostics),
 	].join("\n");
+}
+
+function formatLifecycleDiagnostics(
+	diagnostics: readonly CompactionLifecycleDiagnostic[],
+): string[] {
+	if (diagnostics.length === 0) return ["  none"];
+	return [...diagnostics].reverse().map((entry) => {
+		const fallback = entry.fallbackCategory
+			? ` fallback=${entry.fallbackCategory}`
+			: "";
+		const invariants = entry.violatedInvariants.length
+			? ` invariants=${entry.violatedInvariants.join(",")}`
+			: "";
+		return `  ${entry.timestamp} ${entry.terminalState} trigger=${entry.triggerReason} duration=${entry.durationMs}ms retries=${entry.retryCount}${fallback}${invariants}`;
+	});
 }
