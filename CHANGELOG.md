@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- product vision, contributor workflow, examples, troubleshooting, and performance baseline documentation;
+- coverage and policy benchmark scripts;
+- CI and tag-driven release verification with dependency auditing.
+
 ## v0.1.7
 
 - Adds pre-prompt autocompaction to compact before accepting prompts that would exceed the threshold, then replays the prompt

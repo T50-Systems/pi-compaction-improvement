@@ -4,6 +4,10 @@ Installable Pi package that improves automatic compaction behavior without repla
 
 `pi-compaction-improvement` adds proactive autocompaction triggers, richer compaction summaries, validation contracts, status/config commands, and safe fallback to Pi core when the extension cannot produce a verified result.
 
+## Product vision
+
+Make Pi compaction proactive, context-preserving, observable, and safe without replacing Pi core. See [`docs/PRODUCT.md`](docs/PRODUCT.md) for the product promise and measurable success targets.
+
 ## What it does
 
 - Requests compaction from `turn_end` before the hard context limit is reached.
@@ -64,10 +68,32 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture gui
 - **Contracts guard semantics:** final summaries must preserve required sections, file tags, split-turn context, and size limits.
 - **Fallback is safer than risky output:** Pi core compaction takes over whenever validation fails.
 
-## Install in Pi
+## Quickstart
+
+### 1. Install
 
 ```bash
 pi install git:github.com/T50-Systems/pi-compaction-improvement@main
+```
+
+Restart Pi or run `/reload` after installation.
+
+### 2. Inspect the active policy
+
+```text
+/autocompact-status
+```
+
+### 3. Run a bounded manual check
+
+```text
+/autocompact-now Preserve the active objective, concrete progress, exact files, verification results, and the next executable action.
+```
+
+### 4. Tune only when needed
+
+```text
+/autocompact-config project
 ```
 
 For local development:
@@ -77,6 +103,24 @@ git clone https://github.com/T50-Systems/pi-compaction-improvement
 cd pi-compaction-improvement
 pi install .
 ```
+
+## Troubleshooting
+
+### Commands are unavailable
+
+Confirm installation with `pi list`, restart Pi or run `/reload`, and remove stale duplicate package entries.
+
+### Compaction triggers too often
+
+Run `/autocompact-status` and inspect the trigger reason and cooldown. Use `/autocompact-off` while investigating, or reset project configuration with `/autocompact-config project reset`.
+
+### A generated summary is rejected
+
+This is the safe fallback path: the extension returns control to Pi core when structure, size, split-turn context, or file-tag contracts fail. Enable debug/status output and run the focused tests before weakening a contract.
+
+### Session context appears incomplete after compaction
+
+Inspect the summary for goal/progress, constraints, files, blockers, and the immediate next action. Reproduce with `/autocompact-now`, then report the before/after summary without credentials or private transcript data.
 
 ## Validation
 
@@ -97,8 +141,12 @@ This repository is an installable Pi extension package. It does not provide dura
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture guide.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — design notes.
+- [`docs/EXAMPLES.md`](docs/EXAMPLES.md) — commands and recovery recipes.
 - [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) — implementation details.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — reproducible policy benchmark.
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) — product vision and success metrics.
 - [`reports/roadmap.md`](reports/roadmap.md) — follow-up roadmap.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow.
 - [`CHANGELOG.md`](CHANGELOG.md) — release history.
 
 ## License
