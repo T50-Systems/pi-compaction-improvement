@@ -4,6 +4,7 @@ import {
 	normalizePolicyReport,
 	normalizeSummaryMemory,
 	normalizeSummaryPolicy,
+	normalizeSummaryRegressionPolicy,
 	normalizeSummaryProfile,
 	parseTaggedJson,
 	validateHostedBenchmarkArtifact,
@@ -33,6 +34,17 @@ const rawMemory = ["representative", "near-context-limit"].map((label, index) =>
 }));
 const rawSummaryPolicy = {
 	boundMs: 250,
+	paths: Object.fromEntries(
+		["complete", "timeoutFallback", "abortFallback"].map((name) => [
+			name,
+			{ p99Ms: 0.3, passed: true },
+		]),
+	),
+	passed: true,
+};
+const rawSummaryRegressionPolicy = {
+	budgetMs: 25,
+	evidenceWorkflowRunId: "29458769458",
 	paths: Object.fromEntries(
 		["complete", "timeoutFallback", "abortFallback"].map((name) => [
 			name,
@@ -87,6 +99,8 @@ function evidenceArtifact() {
 			provider: "deterministic-fake",
 			networkCalls: false,
 			summarySafetyBoundMs: 250,
+			summaryRegressionBudgetMs: 25,
+			summaryRegressionEvidenceRunId: "29458769458",
 			finalSummarySloSelected: false,
 		},
 		runs: [
@@ -95,6 +109,9 @@ function evidenceArtifact() {
 				SUMMARY_PROFILE: normalizeSummaryProfile(rawSummaryProfile),
 				SUMMARY_MEMORY: normalizeSummaryMemory(rawMemory),
 				SUMMARY_POLICY: normalizeSummaryPolicy(rawSummaryPolicy),
+				SUMMARY_REGRESSION_POLICY: normalizeSummaryRegressionPolicy(
+					rawSummaryRegressionPolicy,
+				),
 				POLICY_PROFILE: policyProfile,
 				POLICY_RESULT: buildPolicyResult(policyProfile),
 			},
@@ -135,6 +152,21 @@ describe("hosted benchmark evidence", () => {
 		expect(() =>
 			normalizeSummaryPolicy({ ...rawSummaryPolicy, boundMs: 100 }),
 		).toThrow("bound changed from 250 ms");
+	});
+
+	it("enforces the evidence-derived 25 ms regression budget separately", () => {
+		expect(normalizeSummaryRegressionPolicy(rawSummaryRegressionPolicy)).toMatchObject({
+			budgetMs: 25,
+			evidenceWorkflowRunId: "29458769458",
+			finalSlo: false,
+			passed: true,
+		});
+		expect(() =>
+			normalizeSummaryRegressionPolicy({
+				...rawSummaryRegressionPolicy,
+				budgetMs: 20,
+			}),
+		).toThrow("budget changed from 25 ms");
 	});
 
 	it("validates the numeric evidence schema and rejects prompt fields", async () => {

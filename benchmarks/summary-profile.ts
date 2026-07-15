@@ -176,10 +176,27 @@ describe("deterministic summary-generation performance profile", () => {
 			paths,
 			passed: Object.values(paths).every((result) => result.passed),
 		};
+		const regressionBudgetMs = 25;
+		const regressionPaths = Object.fromEntries(
+			Object.entries(paths).map(([name, result]) => [
+				name,
+				{ p99Ms: result.p99Ms, passed: result.p99Ms < regressionBudgetMs },
+			]),
+		);
+		const summaryRegressionPolicy = {
+			budgetMs: regressionBudgetMs,
+			kind: "hosted-regression-budget",
+			evidenceWorkflowRunId: "29458769458",
+			finalSlo: false,
+			paths: regressionPaths,
+			passed: Object.values(regressionPaths).every((result) => result.passed),
+		};
 		console.log(`SUMMARY_PROFILE ${JSON.stringify(report)}`);
 		console.log(`SUMMARY_POLICY ${JSON.stringify(summaryPolicy)}`);
+		console.log(`SUMMARY_REGRESSION_POLICY ${JSON.stringify(summaryRegressionPolicy)}`);
 		for (const result of Object.values(paths)) {
 			expect(result.p99Ms).toBeLessThan(boundMs);
+			expect(result.p99Ms).toBeLessThan(regressionBudgetMs);
 		}
 	});
 
