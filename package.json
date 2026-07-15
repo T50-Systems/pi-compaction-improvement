@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check:file-size": "node scripts/check-file-size.mjs",
+    "validate:github-config": "node scripts/validate-github-config.mjs",
     "test:coverage": "vitest run --coverage",
     "benchmark": "vitest bench --run && npm run benchmark:summary",
     "benchmark:summary": "vitest run --config vitest.profile.config.ts"
@@ -45,8 +46,10 @@
     "@earendil-works/pi-coding-agent": "^0.80.2",
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^4.1.9",
+    "ajv": "8.20.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "yaml": "2.9.0"
   },
   "engines": {
     "node": ">=22.0.0"

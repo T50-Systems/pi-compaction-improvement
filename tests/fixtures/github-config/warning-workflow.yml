@@ -1,0 +1,7 @@
+name: !unknown Parser warning
+on: push
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test

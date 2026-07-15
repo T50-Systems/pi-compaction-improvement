@@ -7,6 +7,7 @@
 - product vision, contributor workflow, examples, troubleshooting, and performance baseline documentation;
 - coverage and policy benchmark scripts;
 - CI and tag-driven release verification with dependency auditing.
+- offline, vendored-schema validation for GitHub Actions and Dependabot configuration, including file-and-line diagnostics and negative fixtures.
 
 ## v0.1.7
 

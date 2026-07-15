@@ -21,6 +21,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - run: npm run validate:github-config
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run check:file-size
