@@ -8,6 +8,7 @@
 - coverage and policy benchmark scripts;
 - CI and tag-driven release verification with dependency auditing.
 - offline, vendored-schema validation for GitHub Actions and Dependabot configuration, including file-and-line diagnostics and negative fixtures.
+- repeated hosted-runner benchmark evidence with schema-validated numeric artifacts and privacy-safe logs.
 
 ## v0.1.7
 

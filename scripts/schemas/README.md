@@ -9,6 +9,8 @@ Validation is intentionally offline: CI and local checks read these reviewed cop
 
 `validate-github-config.mjs` applies one documented local hardening overlay: Dependabot `schedule` objects reject keys not declared by the upstream schema. SchemaStore intentionally leaves those objects open, which would otherwise allow misspelled schedule keys. The negative fixture protects this stricter repository policy.
 
+`hosted-benchmark-results.schema.json` is repository-owned rather than vendored. The hosted benchmark collector validates every numeric evidence artifact against it before upload. Its closed objects intentionally reject prompt, summary, transcript, header, credential, and other unreviewed fields.
+
 ## Review and update procedure
 
 1. Download a candidate schema from the recorded HTTPS URL into a temporary file.

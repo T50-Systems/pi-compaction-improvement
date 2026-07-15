@@ -25,7 +25,8 @@
     "validate:github-config": "node scripts/validate-github-config.mjs",
     "test:coverage": "vitest run --coverage",
     "benchmark": "vitest bench --run && npm run benchmark:summary",
-    "benchmark:summary": "vitest run --config vitest.profile.config.ts"
+    "benchmark:summary": "vitest run --config vitest.profile.config.ts",
+    "benchmark:hosted": "node scripts/run-hosted-benchmarks.mjs"
   },
   "files": [
     "extensions",

@@ -61,7 +61,30 @@ The fake-provider profile also prints `SUMMARY_MEMORY` JSON for:
 
 Each record includes heap and RSS before/after values, observed endpoint peaks, and deltas. This is allocation/retention evidence, not a precise process-wide peak profiler: V8 garbage collection and concurrent runtime allocations can move the values. A local representative run retained about 0.18 MB heap; the earlier 2,000-message calibration retained about 5.6 MB heap. Always use the current command output for the 10,000-message fixture rather than treating those calibration numbers as a budget.
 
-## 3. Real-provider observations
+## 3. Hosted-runner evidence and SLO decisions
+
+CI runs `npm run benchmark:hosted` five times for every supported hosted-runner and Node combination: Ubuntu, Windows, and macOS on Node 22 and 24. Each repetition starts separate Vitest summary-profile and policy-benchmark processes. The fixtures and sample counts stay fixed; elapsed time and memory observations are measurements and therefore vary with runner scheduling.
+
+Each matrix cell uploads only:
+
+- `hosted-benchmark-results.json`, validated against `scripts/schemas/hosted-benchmark-results.schema.json`; and
+- `hosted-benchmark.log`, reconstructed from the same allowlisted numeric records.
+
+The evidence records the runner label, OS release, architecture, Node version, Vitest version, repository commit, workflow run ID/attempt, repetition count, `SUMMARY_PROFILE`, `SUMMARY_MEMORY`, `SUMMARY_POLICY`, normalized policy benchmark numbers, and the existing PERF-1 policy result. The closed schema rejects extra fields. The collector never writes environment dumps, prompts, transcripts, generated summaries, credentials, request headers, or raw provider output, and it never calls a real provider.
+
+### Measurement versus SLO decision
+
+The hosted evidence job is a measurement gate, not permission to choose a tighter SLO. Issue #37 follows this sequence:
+
+1. Collect all five successful repetitions for every OS/Node matrix cell. A missing artifact, failed 250 ms safety check, schema failure, or mixed/missing runtime metadata invalidates that cell.
+2. Review each matrix cell separately before considering an aggregate. For the complete, timeout, and abort paths, compare the distribution of per-repetition p99 values, including the median, upper tail, maximum, and run-to-run spread. Do not hide a slow runner by pooling it with faster runners.
+3. Check memory deltas and policy results for instability, but do not turn endpoint memory observations into a peak-memory budget.
+4. If the hosted distributions are sparse, multimodal, dominated by runner noise, or lack clear headroom, retain the broad 250 ms non-network safety bound and record why. Retention is a valid evidence-based decision.
+5. Only if every supported cell is stable may maintainers propose a conservative tighter regression budget. The proposal must cite hosted run/artifact URLs, state how headroom was derived from the slowest observed cell, preserve protection against hangs/external calls, and include rollback criteria. No candidate value is selected in the measurement change.
+
+A conclusion to retain 250 ms can be documented with the evidence change. Any numerical tightening should be a second budget-decision pull request created after the hosted measurement pull request has produced complete artifacts, so the decision is reviewable independently from the harness that generated its evidence.
+
+## 4. Real-provider observations
 
 Real-provider latency is intentionally outside CI and this benchmark because it includes network transit, provider queueing, model generation, authentication, and rate limits. When collecting an operator observation:
 
