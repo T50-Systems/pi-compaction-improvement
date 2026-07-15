@@ -70,7 +70,7 @@ Each matrix cell uploads only:
 - `hosted-benchmark-results.json`, validated against `scripts/schemas/hosted-benchmark-results.schema.json`; and
 - `hosted-benchmark.log`, reconstructed from the same allowlisted numeric records.
 
-The evidence records the runner label, OS release, architecture, Node version, Vitest version, repository commit, workflow run ID/attempt, repetition count, `SUMMARY_PROFILE`, `SUMMARY_MEMORY`, `SUMMARY_POLICY`, normalized policy benchmark numbers, and the existing PERF-1 policy result. The closed schema rejects extra fields. The collector never writes environment dumps, prompts, transcripts, generated summaries, credentials, request headers, or raw provider output, and it never calls a real provider.
+The evidence records the runner label, OS release, architecture, Node version, Vitest version, repository commit, workflow run ID/attempt, repetition count, `SUMMARY_PROFILE`, `SUMMARY_MEMORY`, `SUMMARY_POLICY`, `SUMMARY_REGRESSION_POLICY`, normalized policy benchmark numbers, and the existing PERF-1 policy result. The closed schema rejects extra fields. The collector never writes environment dumps, prompts, transcripts, generated summaries, credentials, request headers, or raw provider output, and it never calls a real provider.
 
 ### Measurement versus SLO decision
 
@@ -83,6 +83,23 @@ The hosted evidence job is a measurement gate, not permission to choose a tighte
 5. Only if every supported cell is stable may maintainers propose a conservative tighter regression budget. The proposal must cite hosted run/artifact URLs, state how headroom was derived from the slowest observed cell, preserve protection against hangs/external calls, and include rollback criteria. No candidate value is selected in the measurement change.
 
 A conclusion to retain 250 ms can be documented with the evidence change. Any numerical tightening should be a second budget-decision pull request created after the hosted measurement pull request has produced complete artifacts, so the decision is reviewable independently from the harness that generated its evidence.
+
+### Initial hosted decision
+
+[GitHub Actions run 29458769458](https://github.com/T50-Systems/pi-compaction-improvement/actions/runs/29458769458) measured commit `c6b2bb7` from measurement PR #41. All six matrix cells produced five schema-valid repetitions (30 total), and every 250 ms safety and PERF-1 policy result passed.
+
+| Runner / Node | Complete p99 max | Timeout p99 max | Abort p99 max |
+|---|---:|---:|---:|
+| macOS / 22 | 2.2582 ms | 0.1322 ms | 0.1089 ms |
+| macOS / 24 | 1.7840 ms | 0.2280 ms | 0.3777 ms |
+| Ubuntu / 22 | 2.9879 ms | 0.1929 ms | 0.1301 ms |
+| Ubuntu / 24 | 2.3422 ms | 0.5925 ms | 0.1981 ms |
+| Windows / 22 | 3.4443 ms | 0.1436 ms | 0.2090 ms |
+| Windows / 24 | 5.1385 ms | 0.8075 ms | 0.2429 ms |
+
+The slowest observed complete-pipeline p99 was 5.1385 ms. Multiplying that maximum by four gives 20.554 ms; rounding upward to the next 5 ms boundary produces a conservative 25 ms regression budget. This leaves approximately 4.86x headroom over the slowest observed cell and substantially more for timeout and abort paths.
+
+The benchmark therefore enforces two separate policies: `SUMMARY_POLICY` retains the 250 ms hang/external-call safety bound, while `SUMMARY_REGRESSION_POLICY` enforces the evidence-derived 25 ms budget. The latter is a CI regression threshold, not a real-provider or end-user latency SLO. Roll back to measurement-only enforcement if two independent hosted runs exceed 25 ms without a corresponding code regression; otherwise treat an exceedance as a regression to investigate. Endpoint memory deltas remain observations only.
 
 ## 4. Real-provider observations
 

@@ -37,12 +37,14 @@
     "configuration": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repetitions", "provider", "networkCalls", "summarySafetyBoundMs", "finalSummarySloSelected"],
+      "required": ["repetitions", "provider", "networkCalls", "summarySafetyBoundMs", "summaryRegressionBudgetMs", "summaryRegressionEvidenceRunId", "finalSummarySloSelected"],
       "properties": {
         "repetitions": { "type": "integer", "minimum": 1 },
         "provider": { "const": "deterministic-fake" },
         "networkCalls": { "const": false },
         "summarySafetyBoundMs": { "const": 250 },
+        "summaryRegressionBudgetMs": { "const": 25 },
+        "summaryRegressionEvidenceRunId": { "const": "29458769458" },
         "finalSummarySloSelected": { "const": false }
       }
     },
@@ -118,6 +120,28 @@
         "passed": { "type": "boolean" }
       }
     },
+    "summaryRegressionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budgetMs", "kind", "evidenceWorkflowRunId", "finalSlo", "paths", "passed"],
+      "properties": {
+        "budgetMs": { "const": 25 },
+        "kind": { "const": "hosted-regression-budget" },
+        "evidenceWorkflowRunId": { "const": "29458769458" },
+        "finalSlo": { "const": false },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["complete", "timeoutFallback", "abortFallback"],
+          "properties": {
+            "complete": { "$ref": "#/$defs/pathResult" },
+            "timeoutFallback": { "$ref": "#/$defs/pathResult" },
+            "abortFallback": { "$ref": "#/$defs/pathResult" }
+          }
+        },
+        "passed": { "type": "boolean" }
+      }
+    },
     "policyProfileEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -160,12 +184,13 @@
     "run": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["iteration", "SUMMARY_PROFILE", "SUMMARY_MEMORY", "SUMMARY_POLICY", "POLICY_PROFILE", "POLICY_RESULT"],
+      "required": ["iteration", "SUMMARY_PROFILE", "SUMMARY_MEMORY", "SUMMARY_POLICY", "SUMMARY_REGRESSION_POLICY", "POLICY_PROFILE", "POLICY_RESULT"],
       "properties": {
         "iteration": { "type": "integer", "minimum": 1 },
         "SUMMARY_PROFILE": { "$ref": "#/$defs/summaryProfile" },
         "SUMMARY_MEMORY": { "type": "array", "prefixItems": [{ "$ref": "#/$defs/memory" }, { "$ref": "#/$defs/memory" }], "items": false },
         "SUMMARY_POLICY": { "$ref": "#/$defs/summaryPolicy" },
+        "SUMMARY_REGRESSION_POLICY": { "$ref": "#/$defs/summaryRegressionPolicy" },
         "POLICY_PROFILE": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/policyProfileEntry" } },
         "POLICY_RESULT": { "$ref": "#/$defs/policyResult" }
       }

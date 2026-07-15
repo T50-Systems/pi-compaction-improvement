@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 export const SUMMARY_SAFETY_BOUND_MS = 250;
+export const SUMMARY_REGRESSION_BUDGET_MS = 25;
+export const SUMMARY_REGRESSION_EVIDENCE_RUN_ID = "29458769458";
 export const POLICY_P99_TARGET_MS = 5;
 
 const summaryPaths = [
@@ -118,6 +120,41 @@ export function normalizeSummaryPolicy(value) {
 	return {
 		boundMs,
 		kind: "non-network-safety-bound",
+		finalSlo: false,
+		paths: normalizedPaths,
+		passed: Object.values(normalizedPaths).every((result) => result.passed),
+	};
+}
+
+export function normalizeSummaryRegressionPolicy(value) {
+	const input = requireObject(value, "SUMMARY_REGRESSION_POLICY");
+	const budgetMs = requireFiniteNumber(
+		input.budgetMs,
+		"SUMMARY_REGRESSION_POLICY.budgetMs",
+	);
+	if (budgetMs !== SUMMARY_REGRESSION_BUDGET_MS) {
+		throw new Error(
+			`SUMMARY_REGRESSION_POLICY budget changed from ${SUMMARY_REGRESSION_BUDGET_MS} ms`,
+		);
+	}
+	if (input.evidenceWorkflowRunId !== SUMMARY_REGRESSION_EVIDENCE_RUN_ID) {
+		throw new Error("SUMMARY_REGRESSION_POLICY evidence run changed");
+	}
+	const paths = requireObject(input.paths, "SUMMARY_REGRESSION_POLICY.paths");
+	const normalizedPaths = Object.fromEntries(
+		["complete", "timeoutFallback", "abortFallback"].map((name) => {
+			const result = requireObject(
+				paths[name],
+				`SUMMARY_REGRESSION_POLICY.paths.${name}`,
+			);
+			const p99Ms = requireFiniteNumber(result.p99Ms, `${name}.p99Ms`);
+			return [name, { p99Ms, passed: p99Ms < budgetMs }];
+		}),
+	);
+	return {
+		budgetMs,
+		kind: "hosted-regression-budget",
+		evidenceWorkflowRunId: SUMMARY_REGRESSION_EVIDENCE_RUN_ID,
 		finalSlo: false,
 		paths: normalizedPaths,
 		passed: Object.values(normalizedPaths).every((result) => result.passed),

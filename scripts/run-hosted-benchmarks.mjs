@@ -7,12 +7,15 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
 	POLICY_P99_TARGET_MS,
+	SUMMARY_REGRESSION_BUDGET_MS,
+	SUMMARY_REGRESSION_EVIDENCE_RUN_ID,
 	SUMMARY_SAFETY_BOUND_MS,
 	buildPolicyResult,
 	normalizePolicyReport,
 	normalizeSummaryMemory,
 	normalizeSummaryPolicy,
 	normalizeSummaryProfile,
+	normalizeSummaryRegressionPolicy,
 	parseTaggedJson,
 	validateHostedBenchmarkArtifact,
 } from "./hosted-benchmark-results.mjs";
@@ -112,6 +115,8 @@ export async function runHostedBenchmarks({ repetitions, outputDirectory }, env 
 			provider: "deterministic-fake",
 			networkCalls: false,
 			summarySafetyBoundMs: SUMMARY_SAFETY_BOUND_MS,
+			summaryRegressionBudgetMs: SUMMARY_REGRESSION_BUDGET_MS,
+			summaryRegressionEvidenceRunId: SUMMARY_REGRESSION_EVIDENCE_RUN_ID,
 			finalSummarySloSelected: false,
 		},
 		runs: [],
@@ -137,6 +142,9 @@ export async function runHostedBenchmarks({ repetitions, outputDirectory }, env 
 			const summaryPolicy = normalizeSummaryPolicy(
 				parseTaggedJson(summary.stdout, "SUMMARY_POLICY"),
 			);
+			const summaryRegressionPolicy = normalizeSummaryRegressionPolicy(
+				parseTaggedJson(summary.stdout, "SUMMARY_REGRESSION_POLICY"),
+			);
 			const policy = await runVitest([
 				"bench",
 				"--run",
@@ -152,6 +160,7 @@ export async function runHostedBenchmarks({ repetitions, outputDirectory }, env 
 				SUMMARY_PROFILE: summaryProfile,
 				SUMMARY_MEMORY: summaryMemory,
 				SUMMARY_POLICY: summaryPolicy,
+				SUMMARY_REGRESSION_POLICY: summaryRegressionPolicy,
 				POLICY_PROFILE: policyProfile,
 				POLICY_RESULT: policyResult,
 			};
@@ -161,6 +170,7 @@ export async function runHostedBenchmarks({ repetitions, outputDirectory }, env 
 				"SUMMARY_PROFILE",
 				"SUMMARY_MEMORY",
 				"SUMMARY_POLICY",
+				"SUMMARY_REGRESSION_POLICY",
 				"POLICY_PROFILE",
 				"POLICY_RESULT",
 			]) {
@@ -168,7 +178,7 @@ export async function runHostedBenchmarks({ repetitions, outputDirectory }, env 
 			}
 			logLines.push(`REPETITION_RESULT ${iteration} PASS`);
 			console.log(
-				`Repetition ${iteration} passed: summary < ${SUMMARY_SAFETY_BOUND_MS} ms; policy < ${POLICY_P99_TARGET_MS} ms`,
+				`Repetition ${iteration} passed: regression < ${SUMMARY_REGRESSION_BUDGET_MS} ms; safety < ${SUMMARY_SAFETY_BOUND_MS} ms; policy < ${POLICY_P99_TARGET_MS} ms`,
 			);
 			if (summary.stderr.trim()) console.warn("Summary benchmark emitted non-fatal stderr.");
 			if (policy.stderr.trim()) console.warn("Policy benchmark emitted non-fatal stderr.");
