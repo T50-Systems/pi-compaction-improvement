@@ -148,11 +148,39 @@ describe("deterministic summary-generation performance profile", () => {
 			pipelineOperation(40, { ok: false, reason: "aborted" }, undefined, controller.signal),
 		);
 
-		const report = { assembly, verification, complete, aggressive, invalidFallback, timeoutFallback, abortFallback };
+		const report = {
+			assembly,
+			verification,
+			complete,
+			aggressive,
+			invalidFallback,
+			timeoutFallback,
+			abortFallback,
+		};
+		const boundMs = 250;
+		const paths = {
+			complete: { p99Ms: complete.p99Ms, passed: complete.p99Ms < boundMs },
+			timeoutFallback: {
+				p99Ms: timeoutFallback.p99Ms,
+				passed: timeoutFallback.p99Ms < boundMs,
+			},
+			abortFallback: {
+				p99Ms: abortFallback.p99Ms,
+				passed: abortFallback.p99Ms < boundMs,
+			},
+		};
+		const summaryPolicy = {
+			boundMs,
+			kind: "non-network-safety-bound",
+			finalSlo: false,
+			paths,
+			passed: Object.values(paths).every((result) => result.passed),
+		};
 		console.log(`SUMMARY_PROFILE ${JSON.stringify(report)}`);
-		expect(timeoutFallback.p99Ms).toBeLessThan(250);
-		expect(abortFallback.p99Ms).toBeLessThan(250);
-		expect(complete.p99Ms).toBeLessThan(250);
+		console.log(`SUMMARY_POLICY ${JSON.stringify(summaryPolicy)}`);
+		for (const result of Object.values(paths)) {
+			expect(result.p99Ms).toBeLessThan(boundMs);
+		}
 	});
 
 	it("records representative and near-context-limit memory observations", async () => {

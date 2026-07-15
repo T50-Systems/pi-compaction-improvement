@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/T50-Systems/pi-compaction-improvement/schemas/hosted-benchmark-results.schema.json",
+  "title": "Hosted benchmark evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "metadata", "configuration", "runs"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "configuration": { "$ref": "#/$defs/configuration" },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/run" }
+    }
+  },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "finiteNumber": { "type": "number" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner", "os", "arch", "node", "vitest", "repository", "commit", "workflowRunId", "workflowRunAttempt"],
+      "properties": {
+        "runner": { "type": "string" },
+        "os": { "type": "string" },
+        "arch": { "type": "string" },
+        "node": { "type": "string" },
+        "vitest": { "type": "string" },
+        "repository": { "$ref": "#/$defs/nullableString" },
+        "commit": { "$ref": "#/$defs/nullableString" },
+        "workflowRunId": { "$ref": "#/$defs/nullableString" },
+        "workflowRunAttempt": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repetitions", "provider", "networkCalls", "summarySafetyBoundMs", "finalSummarySloSelected"],
+      "properties": {
+        "repetitions": { "type": "integer", "minimum": 1 },
+        "provider": { "const": "deterministic-fake" },
+        "networkCalls": { "const": false },
+        "summarySafetyBoundMs": { "const": 250 },
+        "finalSummarySloSelected": { "const": false }
+      }
+    },
+    "percentiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50Ms", "p95Ms", "p99Ms", "samples"],
+      "properties": {
+        "p50Ms": { "$ref": "#/$defs/finiteNumber" },
+        "p95Ms": { "$ref": "#/$defs/finiteNumber" },
+        "p99Ms": { "$ref": "#/$defs/finiteNumber" },
+        "samples": { "type": "number", "minimum": 1 }
+      }
+    },
+    "summaryProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "verification", "complete", "aggressive", "invalidFallback", "timeoutFallback", "abortFallback"],
+      "properties": {
+        "assembly": { "$ref": "#/$defs/percentiles" },
+        "verification": { "$ref": "#/$defs/percentiles" },
+        "complete": { "$ref": "#/$defs/percentiles" },
+        "aggressive": { "$ref": "#/$defs/percentiles" },
+        "invalidFallback": { "$ref": "#/$defs/percentiles" },
+        "timeoutFallback": { "$ref": "#/$defs/percentiles" },
+        "abortFallback": { "$ref": "#/$defs/percentiles" }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "messageCount", "heapUsedBeforeBytes", "heapUsedAfterBytes", "heapDeltaBytes", "observedPeakHeapBytes", "rssBeforeBytes", "rssAfterBytes", "rssDeltaBytes", "observedPeakRssBytes"],
+      "properties": {
+        "label": { "enum": ["representative", "near-context-limit"] },
+        "messageCount": { "type": "number", "minimum": 1 },
+        "heapUsedBeforeBytes": { "$ref": "#/$defs/finiteNumber" },
+        "heapUsedAfterBytes": { "$ref": "#/$defs/finiteNumber" },
+        "heapDeltaBytes": { "$ref": "#/$defs/finiteNumber" },
+        "observedPeakHeapBytes": { "$ref": "#/$defs/finiteNumber" },
+        "rssBeforeBytes": { "$ref": "#/$defs/finiteNumber" },
+        "rssAfterBytes": { "$ref": "#/$defs/finiteNumber" },
+        "rssDeltaBytes": { "$ref": "#/$defs/finiteNumber" },
+        "observedPeakRssBytes": { "$ref": "#/$defs/finiteNumber" }
+      }
+    },
+    "pathResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p99Ms", "passed"],
+      "properties": {
+        "p99Ms": { "$ref": "#/$defs/finiteNumber" },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "summaryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundMs", "kind", "finalSlo", "paths", "passed"],
+      "properties": {
+        "boundMs": { "const": 250 },
+        "kind": { "const": "non-network-safety-bound" },
+        "finalSlo": { "const": false },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["complete", "timeoutFallback", "abortFallback"],
+          "properties": {
+            "complete": { "$ref": "#/$defs/pathResult" },
+            "timeoutFallback": { "$ref": "#/$defs/pathResult" },
+            "abortFallback": { "$ref": "#/$defs/pathResult" }
+          }
+        },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "policyProfileEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "hz", "min", "max", "mean", "p75", "p99", "p995", "p999", "rme", "sampleCount"],
+      "properties": {
+        "name": { "type": "string" },
+        "hz": { "$ref": "#/$defs/finiteNumber" },
+        "min": { "$ref": "#/$defs/finiteNumber" },
+        "max": { "$ref": "#/$defs/finiteNumber" },
+        "mean": { "$ref": "#/$defs/finiteNumber" },
+        "p75": { "$ref": "#/$defs/finiteNumber" },
+        "p99": { "$ref": "#/$defs/finiteNumber" },
+        "p995": { "$ref": "#/$defs/finiteNumber" },
+        "p999": { "$ref": "#/$defs/finiteNumber" },
+        "rme": { "$ref": "#/$defs/finiteNumber" },
+        "sampleCount": { "type": "number", "minimum": 1 }
+      }
+    },
+    "policyPathResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "p99Ms", "passed"],
+      "properties": {
+        "name": { "type": "string" },
+        "p99Ms": { "$ref": "#/$defs/finiteNumber" },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "policyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetP99Ms", "kind", "paths", "passed"],
+      "properties": {
+        "targetP99Ms": { "const": 5 },
+        "kind": { "const": "existing-perf-1-policy-target" },
+        "paths": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/policyPathResult" } },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iteration", "SUMMARY_PROFILE", "SUMMARY_MEMORY", "SUMMARY_POLICY", "POLICY_PROFILE", "POLICY_RESULT"],
+      "properties": {
+        "iteration": { "type": "integer", "minimum": 1 },
+        "SUMMARY_PROFILE": { "$ref": "#/$defs/summaryProfile" },
+        "SUMMARY_MEMORY": { "type": "array", "prefixItems": [{ "$ref": "#/$defs/memory" }, { "$ref": "#/$defs/memory" }], "items": false },
+        "SUMMARY_POLICY": { "$ref": "#/$defs/summaryPolicy" },
+        "POLICY_PROFILE": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/policyProfileEntry" } },
+        "POLICY_RESULT": { "$ref": "#/$defs/policyResult" }
+      }
+    }
+  }
+}

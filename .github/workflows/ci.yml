@@ -26,3 +26,34 @@ jobs:
       - run: npm run test:coverage
       - run: npm run check:file-size
       - run: npm audit --audit-level=high
+
+  hosted-benchmark-baseline:
+    name: Hosted benchmark (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [22, 24]
+    env:
+      BENCHMARK_REPETITIONS: 5
+      BENCHMARK_RUNNER_LABEL: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run benchmark:hosted -- --output benchmark-results/hosted
+      - name: Upload numeric and sanitized benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-benchmark-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: |
+            benchmark-results/hosted/hosted-benchmark-results.json
+            benchmark-results/hosted/hosted-benchmark.log
+          if-no-files-found: error
+          retention-days: 14
