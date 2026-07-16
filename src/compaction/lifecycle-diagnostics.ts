@@ -10,11 +10,28 @@ export type LifecycleDiagnosticTrigger =
 	| "missing-auth"
 	| "empty-input";
 
+export const LIFECYCLE_DIAGNOSTIC_TRIGGERS = [
+	"manual",
+	"overflow",
+	"threshold",
+	"incompatible-event",
+	"missing-model",
+	"missing-auth",
+	"empty-input",
+] as const satisfies readonly LifecycleDiagnosticTrigger[];
+
 export type LifecycleDiagnosticTerminal =
 	| "skipped"
 	| "failed"
 	| "fallback"
 	| "completed";
+
+export const LIFECYCLE_DIAGNOSTIC_TERMINALS = [
+	"skipped",
+	"failed",
+	"fallback",
+	"completed",
+] as const satisfies readonly LifecycleDiagnosticTerminal[];
 
 export type LifecycleFallbackCategory =
 	| "incompatible-event"
@@ -29,6 +46,21 @@ export type LifecycleFallbackCategory =
 	| "invalid-result"
 	| "verification-failed"
 	| "unexpected-error";
+
+export const LIFECYCLE_DIAGNOSTIC_FALLBACK_CATEGORIES = [
+	"incompatible-event",
+	"missing-model",
+	"missing-auth",
+	"empty-input",
+	"empty-summary",
+	"provider-error",
+	"timeout",
+	"aborted",
+	"invalid-summary",
+	"invalid-result",
+	"verification-failed",
+	"unexpected-error",
+] as const satisfies readonly LifecycleFallbackCategory[];
 
 /**
  * Deliberately closed, privacy-safe diagnostic schema. It has no field capable of

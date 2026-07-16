@@ -1,4 +1,10 @@
-import type { CompactionLifecycleDiagnostic } from "./compaction/lifecycle-diagnostics.ts";
+import {
+	getLifecycleDiagnosticStorePath,
+} from "./compaction/lifecycle-diagnostic-persistence.ts";
+import {
+	MAX_LIFECYCLE_DIAGNOSTICS,
+	type CompactionLifecycleDiagnostic,
+} from "./compaction/lifecycle-diagnostics.ts";
 import type { StatusSnapshot } from "./state.ts";
 
 function formatTokens(value: number | null): string {
@@ -42,6 +48,7 @@ export function formatStatusReport(snapshot: StatusSnapshot): string {
 		snapshot.configInfo.warnings.length > 0
 			? `warnings: ${snapshot.configInfo.warnings.join(" | ")}`
 			: "warnings: none",
+		`diagnosticPersistence: ${snapshot.config.persistLifecycleDiagnostics ? "enabled" : "disabled (default)"}; local-only=${getLifecycleDiagnosticStorePath()}; retention=${MAX_LIFECYCLE_DIAGNOSTICS} categorical entries; free-text=forbidden`,
 		"lifecycle diagnostics (newest first; /autocompact-status clear removes all):",
 		...formatLifecycleDiagnostics(snapshot.state.lifecycleDiagnostics),
 	].join("\n");

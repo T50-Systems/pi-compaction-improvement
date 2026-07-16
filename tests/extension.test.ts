@@ -1,9 +1,14 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { promises as fs } from "node:fs";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import extension from "../extensions/index.ts";
 import { AUTOCOMPACT_DEFER_MS } from "../src/compaction/scheduler.ts";
+import {
+getLifecycleDiagnosticStorePath,
+serializeLifecycleDiagnosticEnvelope,
+} from "../src/compaction/lifecycle-diagnostic-persistence.ts";
 
 type ExtensionHandler = (event: unknown, ctx: unknown) => Promise<void>;
 
@@ -16,7 +21,9 @@ function registerExtension(): Map<string, ExtensionHandler> {
 	return handlers;
 }
 
-async function writeTriggerConfig(): Promise<string> {
+async function writeTriggerConfig(
+	persistLifecycleDiagnostics = false,
+): Promise<string> {
 	const cwd = path.join(tmpdir(), `pi-autocompact-test-${crypto.randomUUID()}`);
 	await mkdir(path.join(cwd, ".pi"), { recursive: true });
 	await writeFile(
@@ -28,6 +35,7 @@ async function writeTriggerConfig(): Promise<string> {
 			minDeltaTokens: 0,
 			minTurnsBetweenCompacts: 0,
 			showStatus: true,
+			persistLifecycleDiagnostics,
 		})}\n`,
 		"utf8",
 	);
@@ -63,6 +71,7 @@ afterEach(() => {
 	vi.useRealTimers();
 	vi.clearAllTimers();
 	vi.clearAllMocks();
+	vi.unstubAllEnvs();
 });
 
 describe("extension registration", () => {
@@ -204,5 +213,57 @@ describe("agent_end autocompact scheduling", () => {
 		await vi.runOnlyPendingTimersAsync();
 
 		expect(ctx.compact).not.toHaveBeenCalled();
+	});
+});
+
+describe("opt-in diagnostic persistence lifecycle", () => {
+	it("hydrates on session start by replacement without duplicate append", async () => {
+		const home = await mkdtemp(path.join(tmpdir(), "pi-autocompact-home-"));
+		vi.stubEnv("HOME", home);
+		vi.stubEnv("USERPROFILE", home);
+		const cwd = await writeTriggerConfig(true);
+		const stored = {
+			timestamp: "2026-07-15T00:00:00.000Z",
+			triggerReason: "threshold" as const,
+			terminalState: "completed" as const,
+			durationMs: 10,
+			retryCount: 0,
+			violatedInvariants: [],
+		};
+		const storePath = getLifecycleDiagnosticStorePath();
+		await mkdir(path.dirname(storePath), { recursive: true });
+		await writeFile(storePath, serializeLifecycleDiagnosticEnvelope([stored]), "utf8");
+
+		const handlers = new Map<string, ExtensionHandler>();
+		const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
+		extension({
+			on: (event: string, handler: ExtensionHandler) => handlers.set(event, handler),
+			registerCommand: (name: string, command: { handler: (args: string, ctx: unknown) => Promise<void> }) => commands.set(name, command),
+		} as never);
+		const ctx = makeContext(cwd);
+		await handlers.get("session_start")?.({}, ctx);
+		await handlers.get("session_start")?.({}, ctx);
+		await commands.get("autocompact-status")?.handler("", ctx);
+
+		const widgetLines = ctx.ui.setWidget.mock.calls.at(-1)?.[1] as string[];
+		expect(widgetLines.filter((line) => line.includes(stored.timestamp))).toHaveLength(1);
+		expect(widgetLines).toContainEqual(expect.stringContaining("diagnosticPersistence: enabled"));
+	});
+
+	it("flushes after lifecycle completion and contains atomic write failures", async () => {
+		const home = await mkdtemp(path.join(tmpdir(), "pi-autocompact-home-"));
+		vi.stubEnv("HOME", home);
+		vi.stubEnv("USERPROFILE", home);
+		const cwd = await writeTriggerConfig(true);
+		const handlers = registerExtension();
+		const ctx = makeContext(cwd);
+
+		await expect(handlers.get("session_before_compact")?.({}, ctx)).resolves.toBeUndefined();
+		const persisted = JSON.parse(await readFile(getLifecycleDiagnosticStorePath(), "utf8")) as { entries: Array<{ fallbackCategory: string }> };
+		expect(persisted.entries).toHaveLength(1);
+		expect(persisted.entries[0]?.fallbackCategory).toBe("incompatible-event");
+
+		vi.spyOn(fs, "rename").mockRejectedValueOnce(new Error("disk unavailable"));
+		await expect(handlers.get("session_before_compact")?.({}, ctx)).resolves.toBeUndefined();
 	});
 });

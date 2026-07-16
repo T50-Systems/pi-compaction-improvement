@@ -16,10 +16,17 @@ describe("normalizeConfig", () => {
     expect(config.softBufferTokens).toBe(900);
     expect(config.rapidGrowthMinPercent).toBe(100);
     expect(config.sustainedGrowthTurns).toBe(1);
+    expect(config.persistLifecycleDiagnostics).toBe(false);
   });
 
   it("matches defaults when empty", () => {
     expect(normalizeConfig({})).toEqual(DEFAULT_CONFIG);
+  });
+
+  it("requires an explicit persistence opt-in", () => {
+    expect(DEFAULT_CONFIG.persistLifecycleDiagnostics).toBe(false);
+    expect(normalizeConfig({ persistLifecycleDiagnostics: "on" }).persistLifecycleDiagnostics).toBe(true);
+    expect(normalizeConfig({ persistLifecycleDiagnostics: "invalid" }).persistLifecycleDiagnostics).toBe(false);
   });
 });
 
@@ -34,5 +41,6 @@ describe("config helpers", () => {
 
   it("formats a concise summary", () => {
     expect(formatConfigSummary(DEFAULT_CONFIG)).toContain("enabled=true");
+    expect(formatConfigSummary(DEFAULT_CONFIG)).toContain("diagnosticPersistence=false");
   });
 });

@@ -17,6 +17,7 @@ export interface AutoCompactConfig {
   minToolResults: number;
   debug: boolean;
   showStatus: boolean;
+  persistLifecycleDiagnostics: boolean;
 }
 
 export interface ConfigLoadResult {
@@ -44,6 +45,7 @@ export const DEFAULT_CONFIG: AutoCompactConfig = {
   minToolResults: 2,
   debug: false,
   showStatus: true,
+  persistLifecycleDiagnostics: false,
 };
 
 type RawConfig = Partial<Record<keyof AutoCompactConfig, unknown>>;
@@ -62,7 +64,12 @@ const INTEGER_FIELDS: Array<keyof AutoCompactConfig> = [
   "minToolResults",
 ];
 
-const BOOLEAN_FIELDS: Array<keyof AutoCompactConfig> = ["enabled", "debug", "showStatus"];
+const BOOLEAN_FIELDS: Array<keyof AutoCompactConfig> = [
+  "enabled",
+  "debug",
+  "showStatus",
+  "persistLifecycleDiagnostics",
+];
 
 function normalizeInteger(value: unknown, fallback: number, minimum: number, maximum?: number): number {
   const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
@@ -99,6 +106,10 @@ export function normalizeConfig(raw?: RawConfig | null): AutoCompactConfig {
     minToolResults: normalizeInteger(input.minToolResults, DEFAULT_CONFIG.minToolResults, 0),
     debug: normalizeBoolean(input.debug, DEFAULT_CONFIG.debug),
     showStatus: normalizeBoolean(input.showStatus, DEFAULT_CONFIG.showStatus),
+    persistLifecycleDiagnostics: normalizeBoolean(
+      input.persistLifecycleDiagnostics,
+      DEFAULT_CONFIG.persistLifecycleDiagnostics,
+    ),
   };
 
   if (config.softBufferTokens < config.emergencyBufferTokens) {
@@ -212,6 +223,7 @@ export function formatConfigSummary(config: AutoCompactConfig): string {
     `emergencyBuffer=${config.emergencyBufferTokens}`,
     `minDelta=${config.minDeltaTokens}`,
     `cooldownTurns=${config.minTurnsBetweenCompacts}`,
+    `diagnosticPersistence=${config.persistLifecycleDiagnostics}`,
   ].join(" | ");
 }
 
