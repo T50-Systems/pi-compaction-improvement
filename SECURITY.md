@@ -18,7 +18,13 @@ Include the affected release or commit, impact, minimal reproduction, and a prop
 
 The extension builds compaction prompts from Pi's prepared conversation slice, prior summary, custom compaction instructions, and file-operation paths. That content is sent to the model provider configured and authenticated by Pi. Provider selection, transport, retention, and processing are therefore part of the configured provider's trust boundary. Users must not assume compaction is local unless their selected provider is local.
 
-The extension's notifications and lifecycle diagnostics never intentionally log prompt text, generated summary text, transcript content, file contents, API keys, authentication headers, or provider tokens. Diagnostics retain only timestamp, trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category in session memory.
+The extension's notifications and lifecycle diagnostics never intentionally log prompt text, generated summary text, transcript content, file contents, API keys, authentication headers, provider tokens, project identity, paths, error messages, or arbitrary free text. Diagnostics contain only timestamp, trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category. They remain session-memory-only unless the user explicitly opts into the closed local persistence format described below.
+
+### Opt-in local diagnostic persistence
+
+`persistLifecycleDiagnostics` is disabled by default. When explicitly enabled, at most 20 categorical records are stored only at `~/.pi/agent/pi-autocompact-v2-diagnostics.json`; no network transport exists. The version-1 envelope and every record use exact key and value allowlists. Unknown fields, corrupt JSON, oversized input, unsupported old versions, and future versions reject the complete payload. Writes use a mode-`0600` same-directory temporary file where supported and best-effort atomic rename. `/autocompact-status clear` best-effort deletes durable and temporary state even after opt-out.
+
+Persistence is observational: every filesystem operation is contained and must not affect summary validation, lifecycle completion, retries, returned compaction results, or fallback to Pi core. Any proposal to add free text, transcript-derived data, credentials, project attribution, remote collection, or a new schema version requires a separate privacy/security review and superseding ADR. See [`docs/decisions/0001-opt-in-local-diagnostic-persistence.md`](docs/decisions/0001-opt-in-local-diagnostic-persistence.md).
 
 ### Provider credentials
 

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import {
 } from "../src/compaction/config-command-handlers.ts";
 import { handleManualCompactCommand } from "../src/compaction/manual-compact-command.ts";
 import { handleStatusCommand } from "../src/compaction/status-command-handlers.ts";
+import { getLifecycleDiagnosticStorePath } from "../src/compaction/lifecycle-diagnostic-persistence.ts";
 import { appendLifecycleDiagnostic } from "../src/compaction/lifecycle-diagnostics.ts";
 import { createInitialState, type CompactionPhase } from "../src/state.ts";
 
@@ -123,6 +124,11 @@ describe("status and manual command handlers", () => {
 
 	it("clears bounded lifecycle diagnostics and the widget deterministically", async () => {
 		const root = await temporaryRoot();
+		vi.stubEnv("HOME", root);
+		vi.stubEnv("USERPROFILE", root);
+		const storePath = getLifecycleDiagnosticStorePath();
+		await mkdir(path.dirname(storePath), { recursive: true });
+		await writeFile(storePath, "persisted", "utf8");
 		const ctx = makeContext(root);
 		const state = createInitialState();
 		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
@@ -135,6 +141,7 @@ describe("status and manual command handlers", () => {
 		await handleStatusCommand("clear", ctx, state);
 
 		expect(state.lifecycleDiagnostics).toEqual([]);
+		await expect(readFile(storePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 		expect(ctx.ui.setWidget).toHaveBeenCalledWith("pi-autocompact-v2-report", undefined, { placement: "belowEditor" });
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("diagnostics"), "info");
 	});

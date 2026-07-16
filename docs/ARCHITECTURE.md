@@ -152,7 +152,11 @@ Those are contract/workflow responsibilities.
 
 `runSummaryAttemptPipeline()` accepts `onLifecycle`, which receives snapshots as phases advance. This gives tests and future telemetry a stable hook without coupling production code to logging.
 
-Production orchestration uses that hook and the attempt result to retain at most 20 privacy-safe lifecycle outcomes in extension memory. Each entry contains a timestamp, trigger category, terminal state (`skipped`, `failed`, `fallback`, or `completed`), duration, retry count, invariant identifiers, and a closed fallback category. The schema intentionally has no free-text payload fields, so it cannot retain prompts, generated summaries, API keys, request headers, transcript content, or file contents. `/autocompact-status clear` empties the history deterministically. The history is session-local and is discarded when the extension process ends.
+Production orchestration uses that hook and the attempt result to retain at most 20 privacy-safe lifecycle outcomes. Each entry contains a timestamp, trigger category, terminal state (`skipped`, `failed`, `fallback`, or `completed`), duration, retry count, invariant identifiers, and a closed fallback category. The schema intentionally has no free-text payload fields, so it cannot retain prompts, transcripts, generated summaries, credentials, API keys, request headers, project identity, paths, error messages, or file contents.
+
+Persistence is an optional infrastructure adapter in `lifecycle-diagnostic-persistence.ts`, governed by [ADR 0001](decisions/0001-opt-in-local-diagnostic-persistence.md). `persistLifecycleDiagnostics` defaults to `false`. When enabled, `session_start` validates and replaces in-memory history from the version-1 exact-allowlist envelope at `~/.pi/agent/pi-autocompact-v2-diagnostics.json`; replacement prevents duplicate append on repeated hydration. Lifecycle completion writes the newest 20 entries through a same-directory temporary file and atomic rename. `/autocompact-status clear` empties memory and best-effort deletes destination and temporary files.
+
+The adapter is deliberately below the compaction decision/result boundary. Missing, corrupt, oversized, old, future-version, or schema-invalid files hydrate as empty. Read/write/delete failures are contained and cannot change retries, verification, returned results, or fallback to Pi core. A future schema requires an explicit migration and privacy-reviewed ADR; unknown versions are never guessed or partially recovered.
 
 ## Formal invariants
 

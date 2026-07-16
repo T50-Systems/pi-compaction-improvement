@@ -10,6 +10,7 @@ import {
 	noteCompactionTriggering,
 	noteEvaluation,
 	noteObservedTokens,
+	type AutoCompactState,
 	type StatusSnapshot,
 } from "../src/state.ts";
 import { estimateToolResultTokens } from "../src/tool-results.ts";
@@ -29,6 +30,10 @@ import {
 import { registerCommands } from "../src/compaction/commands.ts";
 import { handleBeforeCompact } from "../src/compaction/orchestration.ts";
 import { estimateTokens } from "../src/compaction/summary-size-policy.ts";
+import {
+	loadPersistedLifecycleDiagnostics,
+	persistLifecycleDiagnostics,
+} from "../src/compaction/lifecycle-diagnostic-persistence.ts";
 
 function estimateUserInputTokens(event: { text: string; images?: unknown[] }): number {
 	const imageTokens = (event.images?.length ?? 0) * 2_000;
@@ -48,6 +53,23 @@ function replayUserInput(
 	pi.sendUserMessage(event.text);
 }
 
+async function flushLifecycleDiagnostics(
+	ctx: { cwd: string; isProjectTrusted(): boolean },
+	state: AutoCompactState,
+): Promise<void> {
+	try {
+		const configInfo = await loadEffectiveConfig(
+			ctx.cwd,
+			ctx.isProjectTrusted(),
+		);
+		if (configInfo.config.persistLifecycleDiagnostics) {
+			await persistLifecycleDiagnostics(state.lifecycleDiagnostics);
+		}
+	} catch {
+		// Diagnostics are observational and must not affect compaction fallback.
+	}
+}
+
 export default function (pi: ExtensionAPI) {
 	const state = createInitialState();
 	let agentTurnIndex = 0;
@@ -56,6 +78,14 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		const snapshot = await buildStatusSnapshot(ctx, state);
+		if (snapshot.config.persistLifecycleDiagnostics) {
+			const persisted = await loadPersistedLifecycleDiagnostics();
+			state.lifecycleDiagnostics.splice(
+				0,
+				state.lifecycleDiagnostics.length,
+				...persisted,
+			);
+		}
 		applyStatus(ctx, snapshot);
 		debugNotify(
 			ctx,
@@ -249,6 +279,10 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
-		return handleBeforeCompact(event, ctx, state);
+		try {
+			return await handleBeforeCompact(event, ctx, state);
+		} finally {
+			await flushLifecycleDiagnostics(ctx, state);
+		}
 	});
 }

@@ -17,6 +17,7 @@ Implemented in `extensions/index.ts` + `src/policy.ts`:
 - runtime status line
 - manual control commands
 - global + project config files
+- disabled-default, local-only lifecycle diagnostic persistence
 
 ## Summary side (`how`)
 
@@ -42,6 +43,12 @@ Implemented in `extensions/index.ts` + `src/prompt.ts` + `src/file-tags.ts`:
 - `/autocompact-config [global|project] path`
 - `/autocompact-config global <key> <value>`
 
+## Diagnostic persistence
+
+Set `persistLifecycleDiagnostics` with `/autocompact-config global persistLifecycleDiagnostics true` to opt in. The effective global/project configuration controls the feature, while the store remains machine-scoped at `~/.pi/agent/pi-autocompact-v2-diagnostics.json` so it cannot be accidentally committed with a project.
+
+`extensions/index.ts` hydrates by replacement on `session_start` and flushes after `session_before_compact` completes. `status-command-handlers.ts` clears both memory and durable state. `lifecycle-diagnostic-persistence.ts` owns the version-1 exact-allowlist parser, newest-20 retention, 64 KiB input bound, same-directory temporary write/rename, and best-effort failure containment. Unsupported old/future versions and corrupt data load as empty; no migration exists before version 1. See [ADR 0001](decisions/0001-opt-in-local-diagnostic-persistence.md).
+
 ## Validation
 
 Covered by unit tests for:
@@ -51,6 +58,7 @@ Covered by unit tests for:
 - prompt generation
 - file tag handling
 - tool-result size estimation
+- persistence schema, corruption/version behavior, atomic replacement, durable clear, hydration, and failure isolation
 
 ## Architecture reference
 

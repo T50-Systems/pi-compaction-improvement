@@ -34,7 +34,13 @@ Make Pi compaction proactive, context-preserving, observable, and safe without r
 /autocompact-config global <key> <value>
 ```
 
-`/autocompact-status` includes the newest-first, bounded lifecycle diagnostic history. `/autocompact-status clear` removes both that history and the status widget. Diagnostics include only trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category—never prompts, summaries, file contents, headers, tokens, or credentials.
+`/autocompact-status` includes the newest-first, bounded lifecycle diagnostic history and discloses its persistence mode, local path, retention, and categorical-only privacy policy. Diagnostics include only trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category—never prompts, transcripts, summaries, file contents, headers, tokens, credentials, paths, project names, errors, or other free text. Persistence is disabled by default. Opt in locally with:
+
+```text
+/autocompact-config global persistLifecycleDiagnostics true
+```
+
+When enabled, the newest 20 records survive restarts in `~/.pi/agent/pi-autocompact-v2-diagnostics.json`. The versioned file is machine-local, shared across local projects without storing project identity, validated against exact field/category allowlists, and replaced atomically on a best-effort basis. Corrupt, unsupported old, and future-version files are ignored. `/autocompact-status clear` removes memory, the durable file, and the status widget even if persistence is currently disabled. Storage failures never change compaction or Pi-core fallback behavior. See [ADR 0001](docs/decisions/0001-opt-in-local-diagnostic-persistence.md).
 
 ## Architecture
 
@@ -56,6 +62,7 @@ Key files:
 - `src/compaction/pipeline.ts` — generic pipe-and-filter runner.
 - `src/compaction/summary-pipeline.ts` — ordered summary filters.
 - `src/compaction/lifecycle-state-machine.ts` — lifecycle transitions and observability.
+- `src/compaction/lifecycle-diagnostic-persistence.ts` — closed-schema, local-only best-effort diagnostic storage.
 - `src/compaction/compaction-plan.ts` — preservation plan for final summaries.
 - `src/compaction/compaction-workflow.ts` — verification before returning a result.
 - `src/config.ts` / `src/policy.ts` — configuration and trigger policy.
@@ -119,6 +126,10 @@ Run `/autocompact-status` and inspect the trigger reason and cooldown. Use `/aut
 ### A generated summary is rejected
 
 This is the safe fallback path: the extension returns control to Pi core when structure, size, split-turn context, or file-tag contracts fail. Enable debug/status output and run the focused tests before weakening a contract.
+
+### Persisted diagnostics do not appear
+
+Confirm `/autocompact-status` reports `diagnosticPersistence: enabled` and the expected local-only path. Invalid JSON, unknown fields/categories, unsupported versions, files over 64 KiB, and storage errors are intentionally treated as empty. Run `/autocompact-status clear` to remove stale durable state; compaction continues through its normal safe fallback regardless of persistence health.
 
 ### Session context appears incomplete after compaction
 

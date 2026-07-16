@@ -1,3 +1,4 @@
+import { clearPersistedLifecycleDiagnostics } from "./lifecycle-diagnostic-persistence.ts";
 import { clearLifecycleDiagnostics } from "./lifecycle-diagnostics.ts";
 import type { AutoCompactState } from "../state.ts";
 import { formatStatusLine, formatStatusReport } from "../state-formatting.ts";
@@ -16,6 +17,7 @@ export async function handleStatusCommand(
 ): Promise<void> {
 	if (args.trim() === "clear") {
 		clearLifecycleDiagnostics(state.lifecycleDiagnostics);
+		await clearPersistedLifecycleDiagnostics();
 		setStatusReportWidget(ctx);
 		notify(ctx, "Autocompact v2 lifecycle diagnostics and status widget cleared.", "info");
 		return;

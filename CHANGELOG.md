@@ -9,6 +9,7 @@
 - CI and tag-driven release verification with dependency auditing.
 - offline, vendored-schema validation for GitHub Actions and Dependabot configuration, including file-and-line diagnostics and negative fixtures.
 - repeated hosted-runner benchmark evidence with schema-validated numeric artifacts, privacy-safe logs, and a separate evidence-derived regression budget.
+- disabled-default, local-only lifecycle diagnostic persistence with a privacy-reviewed closed schema, bounded retention, durable clear, corruption/version handling, and compaction-safe failure isolation.
 
 ## v0.1.7
 
