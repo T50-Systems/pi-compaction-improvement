@@ -49,7 +49,7 @@ jobs:
       - run: npm run benchmark:hosted -- --output benchmark-results/hosted
       - name: Upload numeric and sanitized benchmark evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hosted-benchmark-${{ matrix.os }}-node-${{ matrix.node-version }}
           path: |
