@@ -49,17 +49,20 @@ Implemented around `session_before_compact`:
 
 This side receives Pi's prepared compaction slice and either returns a validated extension summary or falls back to Pi core by returning `undefined`.
 
+Before summary production, orchestration converts Pi messages to the supported wire shape and invokes the local `cervo-compress` bridge. The bridge is pinned, deterministic, and receives the prepared history over stdin only. Its response must preserve message shape and provide honest byte accounting. Any bridge availability, execution, protocol, structure, or accounting failure returns `undefined` before a provider call.
+
 ## Summary orchestration
 
 `src/compaction/orchestration.ts` is intentionally thin. Its responsibilities are:
 
 1. Parse and validate the raw `session_before_compact` event.
 2. Resolve active model and auth.
-3. Build merged file lists from previous summary tags plus current file operations.
-4. Build a `CompactionPlan`.
-5. Run the summary pipeline.
-6. Retry with aggressive mode only for retryable output-quality failures.
-7. Notify and fall back to Pi core on failure.
+3. Preprocess the prepared history through the locally pinned `cervo-compress` bridge and validate its output.
+4. Build merged file lists from previous summary tags plus current file operations.
+5. Build a `CompactionPlan`.
+6. Run the summary pipeline with content-free CalvoProxy coordination headers.
+7. Retry with aggressive mode only for retryable output-quality failures.
+8. Notify and fall back to Pi core on failure.
 
 It should not contain detailed summary production steps. Those belong in the pipeline.
 
@@ -213,6 +216,8 @@ The plan is passed through the pipeline and consumed by the contract workflow.
 
 The extension should prefer safe fallback over risky output. Common fallback paths:
 
+- unavailable or failed `cervo-compress` bridge;
+- malformed, structurally mutating, or dishonestly accounted preprocessing output;
 - incompatible event;
 - missing model;
 - missing auth;
@@ -263,3 +268,5 @@ npm run check:file-size
 git diff --check
 pi install .
 ```
+
+The request metadata boundary is specified in [`CALVOPROXY_COMPACTION_CONTRACT.md`](CALVOPROXY_COMPACTION_CONTRACT.md). CalvoProxy remains outside the semantic compaction path.

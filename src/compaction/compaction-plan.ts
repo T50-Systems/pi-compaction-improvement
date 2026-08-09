@@ -58,6 +58,7 @@ export function buildCompactionPlan(input: {
 		mustPreserve: {
 			sections: [
 				"Goal",
+				"Constraints & Preferences",
 				"Progress",
 				"Immediate Next Action",
 				"Continuation Contract",

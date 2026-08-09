@@ -10,6 +10,7 @@ import {
 	noteCompactionTriggering,
 	noteEvaluation,
 	noteObservedTokens,
+	rotateCoordinationSessionId,
 	type AutoCompactState,
 	type StatusSnapshot,
 } from "../src/state.ts";
@@ -77,6 +78,7 @@ export default function (pi: ExtensionAPI) {
 	registerCommands(pi, state);
 
 	pi.on("session_start", async (_event, ctx) => {
+		rotateCoordinationSessionId(state);
 		const snapshot = await buildStatusSnapshot(ctx, state);
 		if (snapshot.config.persistLifecycleDiagnostics) {
 			const persisted = await loadPersistedLifecycleDiagnostics();

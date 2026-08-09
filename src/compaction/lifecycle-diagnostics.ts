@@ -45,6 +45,7 @@ export type LifecycleFallbackCategory =
 	| "invalid-summary"
 	| "invalid-result"
 	| "verification-failed"
+	| "preprocessing-failed"
 	| "unexpected-error";
 
 export const LIFECYCLE_DIAGNOSTIC_FALLBACK_CATEGORIES = [
@@ -59,6 +60,7 @@ export const LIFECYCLE_DIAGNOSTIC_FALLBACK_CATEGORIES = [
 	"invalid-summary",
 	"invalid-result",
 	"verification-failed",
+	"preprocessing-failed",
 	"unexpected-error",
 ] as const satisfies readonly LifecycleFallbackCategory[];
 

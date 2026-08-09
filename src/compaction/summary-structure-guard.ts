@@ -1,5 +1,6 @@
 const REQUIRED_HEADERS = [
 	"Goal",
+	"Constraints & Preferences",
 	"Progress",
 	"Immediate Next Action",
 	"Continuation Contract",
@@ -12,6 +13,8 @@ const PLACEHOLDER_PATTERN =
 export type SummaryStructureIssue =
 	| "missing-header"
 	| "empty-section"
+	| "missing-blocked-subsection"
+	| "invalid-next-action"
 	| "placeholder-content";
 
 export interface SummaryStructureValidation {
@@ -48,6 +51,22 @@ function hasMeaningfulSection(summary: string, header: string): boolean {
 		);
 }
 
+function hasProgressBlockers(summary: string): boolean {
+	const progress = sectionBody(summary, "Progress");
+	const blocked = /^###\s+Blocked\s*$([\s\S]*?)(?=^###\s+|$(?![\s\S]))/im.exec(
+		progress,
+	)?.[1];
+	return Boolean(blocked?.trim());
+}
+
+function hasExactlyOneImmediateAction(summary: string): boolean {
+	const body = sectionBody(summary, "Immediate Next Action");
+	return (
+		body.split(/\r?\n/).filter((line) => /^\s*\d+\.\s+\S/.test(line))
+			.length === 1
+	);
+}
+
 export function validateSummaryStructure(
 	summary: string,
 ): SummaryStructureValidation {
@@ -64,6 +83,15 @@ export function validateSummaryStructure(
 			issues.push("empty-section");
 			break;
 		}
+	}
+	if (!missingHeaders.includes("Progress") && !hasProgressBlockers(summary)) {
+		issues.push("missing-blocked-subsection");
+	}
+	if (
+		!missingHeaders.includes("Immediate Next Action") &&
+		!hasExactlyOneImmediateAction(summary)
+	) {
+		issues.push("invalid-next-action");
 	}
 	if (PLACEHOLDER_PATTERN.test(summary)) issues.push("placeholder-content");
 	return {

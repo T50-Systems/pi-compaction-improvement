@@ -6,6 +6,9 @@ import { createInitialState } from "../src/state.ts";
 const SUMMARY = `## Goal
 Continue safely.
 
+## Constraints & Preferences
+- Preserve deterministic fallback behavior.
+
 ## Progress
 ### Done
 - [x] Preserved prior context.

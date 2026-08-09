@@ -4,6 +4,9 @@
 
 ### Added
 
+- Pi-owned deterministic tool-result preprocessing through a pinned `cervo-compress` bridge, with structural/accounting validation and safe Pi-core fallback.
+- a versioned, content-free CalvoProxy coordination header contract with ephemeral conversation ids and no transcript persistence.
+- stricter continuation-summary validation for constraints, blockers, and exactly one immediate next action.
 - product vision, contributor workflow, examples, troubleshooting, and performance baseline documentation;
 - coverage and policy benchmark scripts;
 - CI and tag-driven release verification with dependency auditing.

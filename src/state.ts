@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { CompactionLifecycleDiagnostic } from "./compaction/lifecycle-diagnostics.ts";
 import type { AutoCompactConfig, ConfigLoadResult } from "./config.ts";
 import type { AutoCompactDecisionReason, PolicyEvaluation } from "./policy.ts";
@@ -23,6 +24,7 @@ export interface AutoCompactState {
 	lastCompactionReason: string | null;
 	lastCompactionSource: "extension" | "core" | null;
 	compactionCount: number;
+	coordinationSessionId: string;
 	lifecycleDiagnostics: CompactionLifecycleDiagnostic[];
 }
 
@@ -48,8 +50,17 @@ export function createInitialState(): AutoCompactState {
 		lastCompactionReason: null,
 		lastCompactionSource: null,
 		compactionCount: 0,
+		coordinationSessionId: createCoordinationSessionId(),
 		lifecycleDiagnostics: [],
 	};
+}
+
+export function rotateCoordinationSessionId(state: AutoCompactState): void {
+	state.coordinationSessionId = createCoordinationSessionId();
+}
+
+function createCoordinationSessionId(): string {
+	return randomBytes(16).toString("hex");
 }
 
 export function noteEvaluation(

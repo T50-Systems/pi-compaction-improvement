@@ -45,9 +45,15 @@ export function resolveSummaryReason(state: AutoCompactState): SummaryReason {
 	return "threshold";
 }
 
-function serializeMessages(messages: unknown[], maxTokens?: number): string {
+function serializeMessages(
+	messages: unknown[],
+	maxTokens?: number,
+	messagesAreLlm = false,
+): string {
 	const serialized = condenseSerializedConversationNoise(
-		serializeConversation(convertToLlm(messages as never)),
+		serializeConversation(
+			messagesAreLlm ? (messages as never) : convertToLlm(messages as never),
+		),
 	);
 	return truncateEstimatedTokens(serialized, maxTokens);
 }
@@ -164,7 +170,11 @@ export function buildSummaryRequest(input: {
 	});
 	const messagesBlock = safeTaggedBlock(
 		"messages-to-summarize",
-		serializeMessages(preparation.messagesToSummarize, budgets.messagesMaxTokens),
+		serializeMessages(
+			preparation.messagesToSummarize,
+			budgets.messagesMaxTokens,
+			preparation.messagesAreLlm,
+		),
 	);
 	const previousSummaryBlock = previousSummary
 		? safeTaggedBlock(
@@ -201,7 +211,11 @@ export function buildTurnPrefixSummaryRequest(input: {
 	let promptText = [
 		safeTaggedBlock(
 			"turn-prefix-messages",
-			serializeMessages(input.preparation.turnPrefixMessages, messagesMaxTokens),
+			serializeMessages(
+				input.preparation.turnPrefixMessages,
+				messagesMaxTokens,
+				input.preparation.messagesAreLlm,
+			),
 		),
 		promptInstructions,
 	].join("\n\n");

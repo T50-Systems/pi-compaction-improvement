@@ -20,6 +20,10 @@ The extension builds compaction prompts from Pi's prepared conversation slice, p
 
 The extension's notifications and lifecycle diagnostics never intentionally log prompt text, generated summary text, transcript content, file contents, API keys, authentication headers, provider tokens, project identity, paths, error messages, or arbitrary free text. Diagnostics contain only timestamp, trigger category, terminal state, duration, retry count, invariant identifiers, and fallback category. They remain session-memory-only unless the user explicitly opts into the closed local persistence format described below.
 
+Before the summary request, the prepared history may pass through the local `cervo-compress` helper over stdin/stdout. The helper is pinned, deterministic, and has no network or persistence API. Its response is rejected unless message shape and byte accounting remain verifiable. Bridge stderr and transcript-derived failure text are not retained or surfaced; failure is reduced to a closed category and delegates compaction to Pi core.
+
+Extension-managed summary requests add only the content-free headers defined in [`docs/CALVOPROXY_COMPACTION_CONTRACT.md`](docs/CALVOPROXY_COMPACTION_CONTRACT.md). The ephemeral 128-bit conversation id and categorical compaction header are not written to diagnostics or configuration. Response headers are not persisted. No transcript coordination store is introduced.
+
 ### Opt-in local diagnostic persistence
 
 `persistLifecycleDiagnostics` is disabled by default. When explicitly enabled, at most 20 categorical records are stored only at `~/.pi/agent/pi-autocompact-v2-diagnostics.json`; no network transport exists. The version-1 envelope and every record use exact key and value allowlists. Unknown fields, corrupt JSON, oversized input, unsupported old versions, and future versions reject the complete payload. Writes use a mode-`0600` same-directory temporary file where supported and best-effort atomic rename. `/autocompact-status clear` best-effort deletes durable and temporary state even after opt-out.

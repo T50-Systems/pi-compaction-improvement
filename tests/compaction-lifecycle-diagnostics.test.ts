@@ -4,6 +4,14 @@ import { complete } from "@earendil-works/pi-ai/compat";
 vi.mock("@earendil-works/pi-ai/compat", () => ({
 	complete: vi.fn(),
 }));
+vi.mock("../src/compaction/cervo-preprocessor.ts", () => ({
+	preprocessWithCervoCompress: vi.fn(async (preparation) => ({
+		ok: true,
+		preparation,
+		changed: false,
+		report: { originalBytes: 0, savedBytes: 0, engines: [], byEngine: [] },
+	})),
+}));
 
 import {
 	appendLifecycleDiagnostic,
@@ -14,6 +22,9 @@ import { createInitialState } from "../src/state.ts";
 
 const STRUCTURED_SUMMARY = `## Goal
 Continue safely.
+
+## Constraints & Preferences
+- Preserve deterministic fallback behavior.
 
 ## Progress
 ### Done
@@ -167,5 +178,18 @@ describe("privacy-safe lifecycle diagnostic history", () => {
 			authState,
 		);
 		expect(authState.lifecycleDiagnostics.at(-1)).toMatchObject({ terminalState: "skipped", fallbackCategory: "missing-auth" });
+	});
+
+	it("falls back before provider access when preprocessing is unverifiable", async () => {
+		const state = createInitialState();
+		await handleBeforeCompact(event(), context() as never, state, {
+			preprocess: async () => ({ ok: false, reason: "invalid-output" }),
+		});
+
+		expect(complete).not.toHaveBeenCalled();
+		expect(state.lifecycleDiagnostics.at(-1)).toMatchObject({
+			terminalState: "fallback",
+			fallbackCategory: "preprocessing-failed",
+		});
 	});
 });

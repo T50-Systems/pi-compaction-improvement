@@ -3,6 +3,7 @@ import { formatFileOperations, stripFileTags } from "../file-tags.ts";
 import type { AutoCompactState } from "../state.ts";
 import type { CompactionInvariant } from "./invariants.ts";
 import type { CompactionPlan } from "./compaction-plan.ts";
+import type { CalvoProxyCompactionMetadata } from "./calvoproxy-coordination.ts";
 import { commitVerifiedCompaction } from "./compaction-workflow.ts";
 import {
 	createCompactionLifecycleSnapshot,
@@ -73,6 +74,7 @@ export interface SummaryPipelineInput {
 	lifecycle?: CompactionLifecycleSnapshot;
 	onLifecycle?: (snapshot: CompactionLifecycleSnapshot) => void;
 	onNotify?: (message: string) => void;
+	coordination?: CalvoProxyCompactionMetadata;
 }
 
 interface SummaryPipelineContext extends SummaryPipelineInput {
@@ -179,6 +181,7 @@ const requestHistorySummary: CompactionFilter<SummaryPipelineContext> = async (
 		promptText,
 		maxTokens,
 		signal: producing.signal,
+		coordination: producing.coordination,
 	});
 	if (!summaryResult.ok) {
 		return fail(producing, summaryResult.reason, summaryResult.message);
@@ -240,6 +243,7 @@ const requestTurnPrefixSummary: CompactionFilter<SummaryPipelineContext> = async
 		promptText,
 		maxTokens,
 		signal: producing.signal,
+		coordination: producing.coordination,
 	});
 	if (!summaryResult.ok) {
 		return fail(producing, summaryResult.reason, summaryResult.message);

@@ -9,6 +9,9 @@ import { createInitialState } from "../src/state.ts";
 const VALID_SUMMARY = `## Goal
 Keep the implementation moving.
 
+## Constraints & Preferences
+- Preserve deterministic fallback behavior.
+
 ## Progress
 ### Done
 - [x] Added a contract-driven compaction workflow.

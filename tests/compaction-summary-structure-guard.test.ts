@@ -4,6 +4,9 @@ import { validateSummaryStructure } from "../src/compaction/summary-structure-gu
 const VALID_SUMMARY = `## Goal
 Keep the implementation moving.
 
+## Constraints & Preferences
+- Preserve deterministic fallback behavior.
+
 ## Progress
 ### Done
 - [x] Added a summary guard.
@@ -51,5 +54,17 @@ describe("summary structure guard", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.issues).toContain("placeholder-content");
+	});
+
+	it("requires explicit blockers and exactly one immediate next action", () => {
+		const missingBlocked = validateSummaryStructure(
+			VALID_SUMMARY.replace("### Blocked\n- None.\n", ""),
+		);
+		expect(missingBlocked.issues).toContain("missing-blocked-subsection");
+
+		const multipleActions = validateSummaryStructure(
+			VALID_SUMMARY.replace("1. Run the test suite.", "1. Run tests.\n2. Commit."),
+		);
+		expect(multipleActions.issues).toContain("invalid-next-action");
 	});
 });

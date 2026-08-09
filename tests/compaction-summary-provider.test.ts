@@ -25,6 +25,29 @@ describe("summary provider", () => {
 		expect(complete).toHaveBeenCalledOnce();
 	});
 
+	it("adds only the agreed categorical CalvoProxy coordination headers", async () => {
+		await requestSummary({
+			model,
+			auth: { ...auth, headers: { Authorization: "Bearer private" } },
+			promptText: "prompt",
+			maxTokens: 100,
+			coordination: {
+				sessionId: "0123456789abcdef0123456789abcdef",
+				generation: 2,
+				cause: "growth",
+				result: "structured",
+				tool: "cervo",
+			},
+		});
+
+		expect(vi.mocked(complete).mock.calls.at(-1)?.[2]?.headers).toEqual({
+			Authorization: "Bearer private",
+			"X-Calvoproxy-Session-Id": "0123456789abcdef0123456789abcdef",
+			"X-Calvoproxy-Compaction":
+				"v1;g=2;cause=growth;result=structured;tool=cervo",
+		});
+	});
+
 	it("maps empty provider text to empty result", async () => {
 		vi.mocked(complete).mockResolvedValueOnce({
 			content: [{ type: "text", text: "   " }],
