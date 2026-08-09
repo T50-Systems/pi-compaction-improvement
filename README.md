@@ -14,6 +14,7 @@ Make Pi compaction proactive, context-preserving, observable, and safe without r
 - Triggers on soft threshold, rapid growth, sustained growth, tool-heavy turns, and near-limit emergency bands.
 - Uses cooldown and in-flight guards to avoid repeated or overlapping compactions.
 - Produces richer `session_before_compact` summaries when model/auth context is available.
+- Preprocesses Pi-owned history locally through the deterministic `cervo-compress` pipeline before summary generation.
 - Preserves structured goal/progress/context sections and file tracking tags.
 - Verifies summaries against required sections, size limits, split-turn context, and file-tag expectations.
 - Falls back to Pi core compaction by returning `undefined` whenever output is missing, invalid, oversized, or unverifiable.
@@ -67,6 +68,7 @@ Key files:
 - `src/compaction/compaction-workflow.ts` — verification before returning a result.
 - `src/config.ts` / `src/policy.ts` — configuration and trigger policy.
 - `src/file-tags.ts` / `src/tool-results.ts` — summary preservation helpers.
+- `src/compaction/cervo-preprocessor.ts` / `bridge/cervo-compress/` — deterministic local preprocessing and its pinned library bridge.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture guide.
 
@@ -110,8 +112,14 @@ For local development:
 ```bash
 git clone https://github.com/T50-Systems/pi-compaction-improvement
 cd pi-compaction-improvement
+npm ci
+npm run build:cervo
 pi install .
 ```
+
+The bridge build pins `github.com/cervantesh/cervo-compress` and writes the platform helper to `bin/`. Set `PI_CERVO_COMPRESS_BIN` to an equivalent prebuilt bridge path when Pi runs from a package that does not contain that helper. If the helper is missing or its output cannot be verified, the extension returns control to Pi core before making a custom summary request.
+
+CalvoProxy-named providers receive the content-free coordination headers documented in [`docs/CALVOPROXY_COMPACTION_CONTRACT.md`](docs/CALVOPROXY_COMPACTION_CONTRACT.md). Set `PI_CALVOPROXY_COORDINATION=1` when a generic custom-provider name points at CalvoProxy; the extension does not send its ephemeral conversation id to unrelated providers by default.
 
 ## Troubleshooting
 
@@ -139,6 +147,7 @@ Inspect the summary for goal/progress, constraints, files, blockers, and the imm
 
 ```bash
 npm install
+npm run build:cervo
 npm run typecheck
 npm run test:coverage
 npm run check:file-size
@@ -158,6 +167,7 @@ This repository is an installable Pi extension package. It does not provide dura
 - [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) — implementation details.
 - [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — reproducible policy benchmark.
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product vision and success metrics.
+- [`docs/CALVOPROXY_COMPACTION_CONTRACT.md`](docs/CALVOPROXY_COMPACTION_CONTRACT.md) — privacy-preserving Pi/CalvoProxy header contract.
 - [`reports/roadmap.md`](reports/roadmap.md) — follow-up roadmap.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow.
 - [`SECURITY.md`](SECURITY.md) — private reporting and compaction trust boundaries.

@@ -9,6 +9,14 @@ vi.mock("@earendil-works/pi-ai/compat", () => ({
 		content: [{ type: "text", text: "summary" }],
 	})),
 }));
+vi.mock("../src/compaction/cervo-preprocessor.ts", () => ({
+	preprocessWithCervoCompress: vi.fn(async (preparation) => ({
+		ok: true,
+		preparation,
+		changed: false,
+		report: { originalBytes: 0, savedBytes: 0, engines: [], byEngine: [] },
+	})),
+}));
 import extension from "../extensions/index.ts";
 
 type ExtensionHandler = (event: unknown, ctx: unknown) => Promise<unknown>;
@@ -134,6 +142,7 @@ afterEach(() => {
 	vi.useRealTimers();
 	vi.clearAllTimers();
 	vi.clearAllMocks();
+	vi.unstubAllEnvs();
 });
 
 describe("session_before_compact summarization", () => {
@@ -168,6 +177,7 @@ describe("session_before_compact summarization", () => {
 	});
 
 	it("returns a validated custom compaction for a valid summary", async () => {
+		vi.stubEnv("PI_CALVOPROXY_COORDINATION", "1");
 		const handlers = registerExtension();
 		const ctx = makeContext(await writeTriggerConfig());
 		vi.mocked(complete).mockResolvedValueOnce({
@@ -186,6 +196,11 @@ describe("session_before_compact summarization", () => {
 				tokensBefore: 1000,
 				details: { readFiles: [], modifiedFiles: [] },
 			},
+		});
+		expect(vi.mocked(complete).mock.calls[0]?.[2]?.headers).toMatchObject({
+			"X-Calvoproxy-Session-Id": expect.stringMatching(/^[0-9a-f]{32}$/),
+			"X-Calvoproxy-Compaction":
+				"v1;g=1;cause=threshold;result=structured;tool=cervo",
 		});
 	});
 

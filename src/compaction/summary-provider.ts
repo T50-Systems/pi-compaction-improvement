@@ -1,4 +1,8 @@
 import { complete } from "@earendil-works/pi-ai/compat";
+import {
+	mergeCoordinationHeaders,
+	type CalvoProxyCompactionMetadata,
+} from "./calvoproxy-coordination.ts";
 
 export const SUMMARIZATION_SYSTEM_PROMPT =
 	"You are a context summarization assistant. Read the provided conversation material and output only the requested structured summary. Do not continue the conversation.";
@@ -14,6 +18,7 @@ export interface SummaryProviderInput {
 	maxTokens: number;
 	signal?: AbortSignal;
 	timeoutMs?: number;
+	coordination?: CalvoProxyCompactionMetadata;
 }
 
 export type SummaryProviderResult =
@@ -61,7 +66,10 @@ export async function requestSummary(
 			},
 			{
 				apiKey: input.auth.apiKey,
-				headers: input.auth.headers,
+				headers: mergeCoordinationHeaders(
+					input.auth.headers,
+					input.coordination,
+				),
 				env: input.auth.env,
 				maxTokens: input.maxTokens,
 				signal: timeoutController.signal,

@@ -4,6 +4,7 @@
 
 - Node.js 22 or newer
 - npm
+- Go 1.26 or newer for the pinned `cervo-compress` bridge
 - Pi CLI for interactive validation
 
 ## Shortest path to a verified change
@@ -12,6 +13,8 @@
 git clone https://github.com/T50-Systems/pi-compaction-improvement.git
 cd pi-compaction-improvement
 npm ci
+npm run build:cervo
+(cd bridge/cervo-compress && go test ./...)
 npm run validate:github-config
 npm run typecheck
 npm test

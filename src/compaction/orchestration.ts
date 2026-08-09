@@ -1,6 +1,15 @@
 import type { AutoCompactState } from "../state.ts";
 import { mergeFileLists, parseFileLists } from "../file-tags.ts";
 import { buildCompactionPlan } from "./compaction-plan.ts";
+import {
+	compactionCauseFor,
+	shouldCoordinateWithCalvoProxy,
+	type CalvoProxyCompactionMetadata,
+} from "./calvoproxy-coordination.ts";
+import {
+	preprocessWithCervoCompress,
+	type CervoPreprocessResult,
+} from "./cervo-preprocessor.ts";
 import { parseBeforeCompactEvent } from "./event-guard.ts";
 import { computeFileLists } from "./file-operations.ts";
 import {
@@ -16,7 +25,10 @@ import {
 } from "./summary-pipeline.ts";
 import { type SummaryProviderInput } from "./summary-provider.ts";
 import { notify } from "./telemetry.ts";
-import type { ValidatedExtensionCompaction } from "./types.ts";
+import type {
+	SafeCompactionPreparation,
+	ValidatedExtensionCompaction,
+} from "./types.ts";
 
 interface SummaryContextPort extends NotifyContextPort {
 	model?: SummaryProviderInput["model"];
@@ -29,10 +41,17 @@ interface SummaryContextPort extends NotifyContextPort {
 
 type CompactionResult = ValidatedExtensionCompaction | undefined;
 
+export interface HandleBeforeCompactOptions {
+	preprocess?: (
+		preparation: SafeCompactionPreparation,
+	) => Promise<CervoPreprocessResult>;
+}
+
 export async function handleBeforeCompact(
 	event: unknown,
 	ctx: SummaryContextPort,
 	state: AutoCompactState,
+	options: HandleBeforeCompactOptions = {},
 ): Promise<CompactionResult | undefined> {
 	const startedAt = Date.now();
 	const safeEvent = parseBeforeCompactEvent(event);
@@ -114,21 +133,50 @@ export async function handleBeforeCompact(
 		return;
 	}
 
-	const previousFiles = parseFileLists(preparation.previousSummary);
-	const currentFiles = computeFileLists(preparation.fileOps);
+	const preprocessing = await (
+		options.preprocess ?? preprocessWithCervoCompress
+	)(preparation);
+	if (!preprocessing.ok) {
+		appendLifecycleDiagnostic(state.lifecycleDiagnostics, {
+			triggerReason: reason,
+			terminalState: "fallback",
+			startedAt,
+			fallbackCategory: "preprocessing-failed",
+		});
+		notify(
+			ctx,
+			`Autocompact v2: cervo-compress preprocessing ${preprocessingFailureLabel(preprocessing.reason)}; using default compaction.`,
+			"warning",
+		);
+		return;
+	}
+	const prepared = preprocessing.preparation;
+
+	const previousFiles = parseFileLists(prepared.previousSummary);
+	const currentFiles = computeFileLists(prepared.fileOps);
 	const mergedFiles = mergeFileLists(previousFiles, currentFiles);
 	const plan = buildCompactionPlan({
-		preparation,
+		preparation: prepared,
 		state,
 		reason,
 		willRetry,
 		customInstructions,
 		fileLists: mergedFiles,
 	});
+	const coordination: CalvoProxyCompactionMetadata | undefined =
+		shouldCoordinateWithCalvoProxy(model)
+			? {
+					sessionId: state.coordinationSessionId,
+					generation: state.compactionCount + 1,
+					cause: compactionCauseFor(state.lastCompactionReason, reason),
+					result: "structured",
+					tool: "cervo",
+				}
+			: undefined;
 
 	try {
 		const firstAttempt = await runSummaryAttemptPipeline({
-			preparation,
+			preparation: prepared,
 			state,
 			plan,
 			fileLists: mergedFiles,
@@ -139,11 +187,12 @@ export async function handleBeforeCompact(
 			auth,
 			signal,
 			onNotify: (message) => notify(ctx, message, "info"),
+			coordination,
 		});
 		const retried = shouldRetrySummaryFailure(firstAttempt);
 		const finalAttempt = retried
 			? await runSummaryAttemptPipeline({
-					preparation,
+					preparation: prepared,
 					state,
 					plan,
 					fileLists: mergedFiles,
@@ -155,6 +204,7 @@ export async function handleBeforeCompact(
 					signal,
 					forceMode: "aggressive",
 					onNotify: (message) => notify(ctx, message, "info"),
+					coordination,
 				})
 			: firstAttempt;
 		if (finalAttempt.ok) {
@@ -188,6 +238,19 @@ export async function handleBeforeCompact(
 		const message = error instanceof Error ? error.message : String(error);
 		if (!aborted) notify(ctx, `Autocompact v2 failed: ${message}`, "error");
 		return;
+	}
+}
+
+function preprocessingFailureLabel(
+	reason: Exclude<CervoPreprocessResult, { ok: true }>["reason"],
+): string {
+	switch (reason) {
+		case "bridge-unavailable":
+			return "is unavailable";
+		case "invalid-output":
+			return "returned unverifiable output";
+		default:
+			return "failed";
 	}
 }
 

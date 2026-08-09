@@ -19,6 +19,7 @@ export interface FileOperationsLike {
 export interface SafeCompactionPreparation {
 	messagesToSummarize: unknown[];
 	turnPrefixMessages: unknown[];
+	messagesAreLlm?: boolean;
 	firstKeptEntryId: string;
 	tokensBefore: number;
 	previousSummary: string | undefined;

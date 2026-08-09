@@ -2,14 +2,23 @@
 
 ## [Unreleased]
 
+## v0.1.8
+
 ### Added
 
+- Pi-owned deterministic tool-result preprocessing through a pinned `cervo-compress` bridge, with structural/accounting validation and safe Pi-core fallback.
+- a versioned, content-free CalvoProxy coordination header contract with ephemeral conversation ids and no transcript persistence.
+- stricter continuation-summary validation for constraints, blockers, and exactly one immediate next action.
 - product vision, contributor workflow, examples, troubleshooting, and performance baseline documentation;
 - coverage and policy benchmark scripts;
 - CI and tag-driven release verification with dependency auditing.
 - offline, vendored-schema validation for GitHub Actions and Dependabot configuration, including file-and-line diagnostics and negative fixtures.
 - repeated hosted-runner benchmark evidence with schema-validated numeric artifacts, privacy-safe logs, and a separate evidence-derived regression budget.
 - disabled-default, local-only lifecycle diagnostic persistence with a privacy-reviewed closed schema, bounded retention, durable clear, corruption/version handling, and compaction-safe failure isolation.
+
+### Changed
+
+- refreshed Pi development dependencies to patched releases and aligned the minimum Node.js version with their runtime requirement.
 
 ## v0.1.7
 
