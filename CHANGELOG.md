@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## v0.1.8
+
 ### Added
 
 - Pi-owned deterministic tool-result preprocessing through a pinned `cervo-compress` bridge, with structural/accounting validation and safe Pi-core fallback.
@@ -13,6 +15,10 @@
 - offline, vendored-schema validation for GitHub Actions and Dependabot configuration, including file-and-line diagnostics and negative fixtures.
 - repeated hosted-runner benchmark evidence with schema-validated numeric artifacts, privacy-safe logs, and a separate evidence-derived regression budget.
 - disabled-default, local-only lifecycle diagnostic persistence with a privacy-reviewed closed schema, bounded retention, durable clear, corruption/version handling, and compaction-safe failure isolation.
+
+### Changed
+
+- refreshed Pi development dependencies to patched releases and aligned the minimum Node.js version with their runtime requirement.
 
 ## v0.1.7
 
