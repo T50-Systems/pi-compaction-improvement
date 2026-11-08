@@ -62,8 +62,8 @@ Código existente a reutilizar:
 ## Verification
 
 - Ejecutar en `C:/dev/pi/pi-compaction-improvement`:
-  - `npm run typecheck`
-  - `npm test`
+  - `pnpm run typecheck`
+  - `pnpm test`
 - Validar diagnósticos en archivos tocados:
   - `lsp_diagnostics` sobre `extensions/index.ts` y `tests/extension.test.ts`
   - `lens_diagnostics delta`

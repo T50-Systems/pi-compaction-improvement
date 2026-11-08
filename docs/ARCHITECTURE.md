@@ -262,9 +262,9 @@ When changing compaction behavior:
 ## Current validation command set
 
 ```bash
-npm run typecheck
-npm run test:coverage
-npm run check:file-size
+pnpm run typecheck
+pnpm run test:coverage
+pnpm run check:file-size
 git diff --check
 pi install .
 ```

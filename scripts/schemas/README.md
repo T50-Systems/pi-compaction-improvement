@@ -16,7 +16,7 @@ Validation is intentionally offline: CI and local checks read these reviewed cop
 1. Download a candidate schema from the recorded HTTPS URL into a temporary file.
 2. Review the upstream SchemaStore history and the full local diff. Schema changes can expand accepted workflow behavior and therefore require the same review as a dependency update.
 3. Replace the vendored file and update the date and SHA-256 in this table.
-4. Run `npm run validate:github-config` and `npm test`; confirm the negative fixtures still fail with file-and-line diagnostics.
+4. Run `pnpm run validate:github-config` and `pnpm test`; confirm the negative fixtures still fail with file-and-line diagnostics.
 5. Submit the schema update through a pull request. Never fetch a schema dynamically from CI.
 
 Generate the review digest with:

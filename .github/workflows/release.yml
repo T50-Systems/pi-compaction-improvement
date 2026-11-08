@@ -12,16 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10.34.9
+          run_install: false
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run validate:github-config
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run check:file-size
-      - run: npm audit --audit-level=high
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run validate:github-config
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run check:file-size
+      - run: pnpm audit --audit-level=high
       - name: Verify tag matches package version
         shell: bash
         run: |
