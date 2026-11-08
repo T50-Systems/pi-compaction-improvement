@@ -15,7 +15,7 @@ Long sessions compact before hard limits while preserving goals, progress, files
 | SAFE-1 | Invalid or unverifiable summaries returned | 0 | contract/workflow tests |
 | REL-1 | Duplicate or overlapping compactions | 0 known; 100% guard pass | scheduler/lifecycle tests |
 | REL-2 | Required context preserved | 100% invariant pass | summary/invariant tests |
-| PERF-1 | Local policy decision overhead | p99 < 5 ms | `npm run benchmark` |
+| PERF-1 | Local policy decision overhead | p99 < 5 ms | `pnpm run benchmark` |
 | UX-1 | Classified failures have recovery/fallback | 100% | command/status tests and docs |
 
 Targets are validated locally and in CI. The extension does not collect remote usage telemetry.

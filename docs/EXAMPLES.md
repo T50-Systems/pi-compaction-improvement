@@ -36,8 +36,8 @@ Prefer project scope for repository-specific tuning. Use `/autocompact-config pr
 ## Validate a checkout
 
 ```bash
-npm run typecheck
-npm test
-npm run check:file-size
-npm run benchmark
+pnpm run typecheck
+pnpm test
+pnpm run check:file-size
+pnpm run benchmark
 ```

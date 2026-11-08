@@ -112,8 +112,8 @@ For local development:
 ```bash
 git clone https://github.com/T50-Systems/pi-compaction-improvement
 cd pi-compaction-improvement
-npm ci
-npm run build:cervo
+pnpm install --frozen-lockfile
+pnpm run build:cervo
 pi install .
 ```
 
@@ -146,11 +146,11 @@ Inspect the summary for goal/progress, constraints, files, blockers, and the imm
 ## Validation
 
 ```bash
-npm install
-npm run build:cervo
-npm run typecheck
-npm run test:coverage
-npm run check:file-size
+pnpm install --frozen-lockfile
+pnpm run build:cervo
+pnpm run typecheck
+pnpm run test:coverage
+pnpm run check:file-size
 git diff --check
 pi install .
 ```

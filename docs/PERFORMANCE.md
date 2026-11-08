@@ -3,8 +3,8 @@
 Run every non-network benchmark from a clean checkout with:
 
 ```bash
-npm ci
-npm run benchmark
+pnpm install --frozen-lockfile
+pnpm run benchmark
 ```
 
 The command runs two deliberately separate harnesses. Neither sends requests to a real model provider.
@@ -63,7 +63,7 @@ Each record includes heap and RSS before/after values, observed endpoint peaks, 
 
 ## 3. Hosted-runner evidence and SLO decisions
 
-CI runs `npm run benchmark:hosted` five times for every supported hosted-runner and Node combination: Ubuntu, Windows, and macOS on Node 22 and 24. Each repetition starts separate Vitest summary-profile and policy-benchmark processes. The fixtures and sample counts stay fixed; elapsed time and memory observations are measurements and therefore vary with runner scheduling.
+CI runs `pnpm run benchmark:hosted` five times for every supported hosted-runner and Node combination: Ubuntu, Windows, and macOS on Node 22 and 24. Each repetition starts separate Vitest summary-profile and policy-benchmark processes. The fixtures and sample counts stay fixed; elapsed time and memory observations are measurements and therefore vary with runner scheduling.
 
 Each matrix cell uploads only:
 
